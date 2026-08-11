@@ -1,0 +1,19 @@
+#docker compose usando meu dockerfile local e subindo um container do postgres
+services:
+  oficina-ddd:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8080:8080"
+    depends_on:
+      - postgres
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+  postgres:
+    image: postgres:18.4-alpine3.23
+    environment:
+      POSTGRES_DB: oficina_db
+      POSTGRES_USER: oficina_user
+      POSTGRES_PASSWORD: "password123"
+  
