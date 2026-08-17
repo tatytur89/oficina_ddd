@@ -28,10 +28,21 @@ private final SecurityFilter securityFilter;
                 .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(req -> {
                     // Libera as rotas da documentação do Swagger
-                    req.requestMatchers("/v3/api-docs/**", "/swagger-ui.html", "/swagger-ui/**").permitAll();
+                    req.requestMatchers(
+                        "/v3/api-docs/**",
+                        "/v3/api-docs",
+                        "/swagger-ui.html",
+                        "/swagger-ui/**",
+                        "/swagger-ui/index.html",
+                        "/swagger-ui/index.html/**",
+                        "/webjars/**"
+                    ).permitAll();
                     
                     // Libera a rota de autenticação/login
                     req.requestMatchers(HttpMethod.POST, "/api/v1/auth/login").permitAll();
+                    
+                    // Libera endpoint público de acompanhamento de OS
+                    req.requestMatchers(HttpMethod.GET, "/api/v1/os/*/acompanhar").permitAll();
                     
                     // Exige autenticação (token JWT) para todas as outras rotas
                     req.anyRequest().authenticated();

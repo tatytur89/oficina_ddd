@@ -29,7 +29,7 @@ ENV SPRING_PROFILES_ACTIVE=docker
 COPY --from=builder /app/target/*.jar app.jar
 
 # Expõe a porta padrão do Spring Boot
-EXPOSE 8080
+EXPOSE 8089
 
 # Comando de inicialização otimizado para containers
 ENTRYPOINT ["java", "-jar", "app.jar"]

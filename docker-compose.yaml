@@ -5,9 +5,10 @@ services:
       context: .
       dockerfile: Dockerfile
     ports:
-      - "8080:8080"
+      - "8089:8080"
     depends_on:
-      - postgres
+      postgres:
+        condition: service_healthy
     environment:
       SPRING_PROFILES_ACTIVE: docker
   postgres:
@@ -16,4 +17,8 @@ services:
       POSTGRES_DB: oficina_db
       POSTGRES_USER: oficina_user
       POSTGRES_PASSWORD: "password123"
-  
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U oficina_user -d oficina_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
