@@ -1,0 +1,204 @@
+{
+  "info": {
+    "name": "Oficina DDD API",
+    "description": "Colecao para testar a API da oficina. Execute Login primeiro; o token sera salvo automaticamente no ambiente.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{token}}",
+        "type": "string"
+      }
+    ]
+  },
+  "item": [
+    {
+      "name": "Autenticacao",
+      "item": [
+        {
+          "name": "Login administrador",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const body = pm.response.json();",
+                  "if (body.token) pm.collectionVariables.set('token', body.token);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "auth": {
+              "type": "noauth"
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"usuario\": \"admin\",\n  \"senha\": \"admin123\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "http://localhost:8089/api/v1/auth/login",
+              "host": ["http://localhost:8089"],
+              "path": ["api", "v1", "auth", "login"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Cadastros",
+      "item": [
+        {
+          "name": "Cadastrar cliente",
+          "request": {
+            "method": "POST",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nome\": \"Joao da Silva\",\n  \"documento\": \"12345678909\",\n  \"email\": \"joao@example.com\",\n  \"telefone\": \"11999999999\"\n}",
+              "options": {"raw": {"language": "json"}}
+            },
+            "url": {"raw": "http://localhost:8089/api/v1/clientes", "host": ["http://localhost:8089"], "path": ["api", "v1", "clientes"]}
+          }
+        },
+        {
+          "name": "Listar clientes",
+          "request": {"method": "GET", "url": {"raw": "http://localhost:8089/api/v1/clientes", "host": ["http://localhost:8089"], "path": ["api", "v1", "clientes"]}}
+        },
+        {
+          "name": "Buscar cliente por documento",
+          "request": {"method": "GET", "url": {"raw": "http://localhost:8089/api/v1/clientes/documento/12345678909", "host": ["http://localhost:8089"], "path": ["api", "v1", "clientes", "documento", "12345678909"]}}
+        },
+        {
+          "name": "Cadastrar veiculo",
+          "request": {
+            "method": "POST",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "body": {"mode": "raw", "raw": "{\n  \"marca\": \"Toyota\",\n  \"modelo\": \"Corolla\",\n  \"ano\": 2022,\n  \"placa\": \"ABC1D23\",\n  \"clienteId\": 1\n}", "options": {"raw": {"language": "json"}}},
+            "url": {"raw": "http://localhost:8089/api/v1/veiculos", "host": ["http://localhost:8089"], "path": ["api", "v1", "veiculos"]}
+          }
+        },
+        {
+          "name": "Listar veiculos",
+          "request": {"method": "GET", "url": {"raw": "http://localhost:8089/api/v1/veiculos", "host": ["http://localhost:8089"], "path": ["api", "v1", "veiculos"]}}
+        },
+        {
+          "name": "Listar veiculos por cliente",
+          "request": {"method": "GET", "url": {"raw": "http://localhost:8089/api/v1/veiculos/cliente/1", "host": ["http://localhost:8089"], "path": ["api", "v1", "veiculos", "cliente", "1"]}}
+        },
+        {
+          "name": "Buscar veiculo por placa",
+          "request": {"method": "GET", "url": {"raw": "http://localhost:8089/api/v1/veiculos/placa/ABC1D23", "host": ["http://localhost:8089"], "path": ["api", "v1", "veiculos", "placa", "ABC1D23"]}}
+        },
+        {
+          "name": "Cadastrar servico",
+          "request": {
+            "method": "POST",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "body": {"mode": "raw", "raw": "{\n  \"nome\": \"Troca de oleo\",\n  \"descricao\": \"Troca de oleo do motor\",\n  \"preco\": 150.00,\n  \"tipo\": \"MANUTENCAO\",\n  \"tempoEstimadoMinutos\": 60\n}", "options": {"raw": {"language": "json"}}},
+            "url": {"raw": "http://localhost:8089/api/v1/servicos", "host": ["http://localhost:8089"], "path": ["api", "v1", "servicos"]}
+          }
+        },
+        {
+          "name": "Listar servicos",
+          "request": {"method": "GET", "url": {"raw": "http://localhost:8089/api/v1/servicos", "host": ["http://localhost:8089"], "path": ["api", "v1", "servicos"]}}
+        },
+        {
+          "name": "Buscar servico por ID",
+          "request": {"method": "GET", "url": {"raw": "http://localhost:8089/api/v1/servicos/1", "host": ["http://localhost:8089"], "path": ["api", "v1", "servicos", "1"]}}
+        },
+        {
+          "name": "Cadastrar peca",
+          "request": {
+            "method": "POST",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "body": {"mode": "raw", "raw": "{\n  \"nome\": \"Filtro de oleo\",\n  \"descricao\": \"Filtro para motor\",\n  \"codigo\": \"FIL001\",\n  \"preco\": 45.90,\n  \"quantidadeEstoque\": 50,\n  \"estoqueMinimo\": 10\n}", "options": {"raw": {"language": "json"}}},
+            "url": {"raw": "http://localhost:8089/api/v1/pecas", "host": ["http://localhost:8089"], "path": ["api", "v1", "pecas"]}
+          }
+        },
+        {
+          "name": "Listar pecas",
+          "request": {"method": "GET", "url": {"raw": "http://localhost:8089/api/v1/pecas", "host": ["http://localhost:8089"], "path": ["api", "v1", "pecas"]}}
+        },
+        {
+          "name": "Buscar peca por ID",
+          "request": {"method": "GET", "url": {"raw": "http://localhost:8089/api/v1/pecas/1", "host": ["http://localhost:8089"], "path": ["api", "v1", "pecas", "1"]}}
+        },
+          {
+            "name": "Buscar peca por codigo",
+            "request": {"method": "GET", "url": {"raw": "http://localhost:8089/api/v1/pecas/codigo/FIL001", "host": ["http://localhost:8089"], "path": ["api", "v1", "pecas", "codigo", "FIL001"]}}
+        },
+        {
+          "name": "Repor estoque",
+          "request": {"method": "PUT", "url": {"raw": "http://localhost:8089/api/v1/pecas/1/repor-estoque/10", "host": ["http://localhost:8089"], "path": ["api", "v1", "pecas", "1", "repor-estoque", "10"]}}
+        },
+          {
+            "name": "Listar estoque baixo",
+            "request": {"method": "GET", "url": {"raw": "http://localhost:8089/api/v1/pecas/estoque-baixo", "host": ["http://localhost:8089"], "path": ["api", "v1", "pecas", "estoque-baixo"]}}
+        }
+      ]
+    },
+    {
+      "name": "Ordens de servico",
+      "item": [
+        {
+          "name": "Criar OS",
+          "request": {
+            "method": "POST",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "body": {"mode": "raw", "raw": "{\n  \"clienteId\": 1,\n  \"veiculoId\": 1,\n  \"dataPrevistaEntrega\": \"2026-08-30T18:00:00\",\n  \"observacoes\": \"Ruido no freio dianteiro\",\n  \"servicos\": [{\n    \"servicoId\": 1,\n    \"quantidade\": 1\n  }],\n  \"pecas\": [{\n    \"pecaId\": 1,\n    \"quantidade\": 1\n  }]\n}", "options": {"raw": {"language": "json"}}},
+            "url": {"raw": "http://localhost:8089/api/v1/os", "host": ["http://localhost:8089"], "path": ["api", "v1", "os"]}
+          }
+        },
+        {
+          "name": "Listar OS",
+          "request": {"method": "GET", "url": {"raw": "http://localhost:8089/api/v1/os", "host": ["http://localhost:8089"], "path": ["api", "v1", "os"]}}
+        },
+        {
+          "name": "Buscar OS por ID",
+          "request": {"method": "GET", "url": {"raw": "http://localhost:8089/api/v1/os/1", "host": ["http://localhost:8089"], "path": ["api", "v1", "os", "1"]}}
+        },
+        {
+          "name": "Listar OS por cliente",
+          "request": {"method": "GET", "url": {"raw": "http://localhost:8089/api/v1/os/cliente/1", "host": ["http://localhost:8089"], "path": ["api", "v1", "os", "cliente", "1"]}}
+        },
+        {
+          "name": "Listar OS por status",
+          "request": {"method": "GET", "url": {"raw": "http://localhost:8089/api/v1/os/status/RECEBIDA", "host": ["http://localhost:8089"], "path": ["api", "v1", "os", "status", "RECEBIDA"]}}
+        },
+        {
+          "name": "Listar OS por periodo",
+          "request": {"method": "GET", "url": {"raw": "http://localhost:8089/api/v1/os/periodo?inicio=2026-08-01T00:00:00&fim=2026-08-31T23:59:59", "host": ["http://localhost:8089"], "path": ["api", "v1", "os", "periodo"], "query": [{"key": "inicio", "value": "2026-08-01T00:00:00"}, {"key": "fim", "value": "2026-08-31T23:59:59"}]}}
+        },
+        {
+          "name": "Enviar orcamento",
+          "request": {"method": "PATCH", "url": {"raw": "http://localhost:8089/api/v1/os/1/orcamento", "host": ["http://localhost:8089"], "path": ["api", "v1", "os", "1", "orcamento"]}}
+        },
+        {
+          "name": "Atualizar status da OS",
+          "request": {"method": "PATCH", "url": {"raw": "http://localhost:8089/api/v1/os/1/status/EM_ANDAMENTO", "host": ["http://localhost:8089"], "path": ["api", "v1", "os", "1", "status", "EM_ANDAMENTO"]}}
+        },
+        {
+          "name": "Acompanhar OS (publico)",
+          "request": {"method": "GET", "auth": {"type": "noauth"}, "url": {"raw": "http://localhost:8089/api/v1/os/1/acompanhar", "host": ["http://localhost:8089"], "path": ["api", "v1", "os", "1", "acompanhar"]}}
+        }
+      ]
+    }
+  ]
+}

@@ -9,4 +9,6 @@ public interface ClienteRepositoryPort {
     Cliente salvar(Cliente cliente);
     List<Cliente> buscarTodos();
     Optional<Cliente> buscarPorDocumento(String documento);
+    Optional<Cliente> buscarPorId(Long id);
+    void excluirPorId(Long id);
 }

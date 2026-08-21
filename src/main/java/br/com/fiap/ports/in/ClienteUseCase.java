@@ -9,4 +9,7 @@ public interface ClienteUseCase {
     Cliente cadastrarCliente(Cliente cliente);
     List<Cliente> listarTodos();
     Optional<Cliente> buscarPorDocumento(String documento);
+    Cliente atualizarCliente(Cliente cliente);
+    void excluirCliente(Long id);
+    
 }

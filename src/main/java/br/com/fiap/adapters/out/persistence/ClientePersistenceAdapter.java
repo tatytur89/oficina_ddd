@@ -38,13 +38,17 @@ public class ClientePersistenceAdapter implements ClienteRepositoryPort {
         );
     }
 
-@Override
+    @Override
     public List<Cliente> buscarTodos() {
         return jpaRepository.findAll().stream()
                 .map(this::mapearParaDominio)
                 .toList();
     }
-
+    
+        public Optional<Cliente> buscarPorId(Long id) {
+    	return jpaRepository.findById(id).map(this::mapearParaDominio);
+    }
+    
     @Override
     public Optional<Cliente> buscarPorDocumento(String documento) {
         return jpaRepository.findByDocumento(documento)
@@ -61,5 +65,11 @@ public class ClientePersistenceAdapter implements ClienteRepositoryPort {
             entity.getTelefone()
         );
     }
+
+	@Override
+    public void excluirPorId(Long id) {
+		jpaRepository.deleteById(id);
+		
+	}
 }
 
