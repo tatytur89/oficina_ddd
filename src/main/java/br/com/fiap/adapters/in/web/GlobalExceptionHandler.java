@@ -1,5 +1,6 @@
 package br.com.fiap.adapters.in.web;
 
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.MethodArgumentNotValidException;
@@ -15,9 +16,7 @@ import br.com.fiap.application.exceptions.ResourceNotFoundException;
 public class GlobalExceptionHandler {
 
 	@ExceptionHandler(IllegalArgumentException.class)
-	public ResponseEntity<Response<Void>> handleIllegalArgument(
-	        IllegalArgumentException ex,
-	        WebRequest request) {
+	public ResponseEntity<Response<Void>> handleIllegalArgument(IllegalArgumentException ex, WebRequest request) {
 
 	    Response<Void> resposta = new Response<>(
 	            "error",
@@ -26,12 +25,11 @@ public class GlobalExceptionHandler {
 	    );
 
 	    return ResponseEntity.badRequest().body(resposta);
+	    
 	}
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
-    public ResponseEntity<Response<Void>> handleValidation(
-            MethodArgumentNotValidException ex,
-            WebRequest request) {
+    public ResponseEntity<Response<Void>> handleValidation(MethodArgumentNotValidException ex, WebRequest request) {
 
         String mensagem = ex.getBindingResult()
                 .getFieldErrors()
@@ -49,11 +47,11 @@ public class GlobalExceptionHandler {
         );
 
         return ResponseEntity.badRequest().body(resposta);
+        
     }
 
-    public ResponseEntity<Response<Void>> handleResourceAlreadyExists(
-            ResourceAlreadyExistsException ex,
-            WebRequest request) {
+    @ExceptionHandler(ResourceAlreadyExistsException.class)
+    public ResponseEntity<Response<Void>> handleResourceAlreadyExists(ResourceAlreadyExistsException ex, WebRequest request) {
 
         Response<Void> resposta = new Response<>(
                 "error",
@@ -61,14 +59,12 @@ public class GlobalExceptionHandler {
                 null
         );
 
-        return ResponseEntity.status(HttpStatus.CONFLICT)
-                .body(resposta);
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(resposta);
+        
     }
     
     @ExceptionHandler(ResourceNotFoundException.class)
-    public ResponseEntity<Response<Void>> handleResourceNotFound(
-            ResourceNotFoundException ex,
-            WebRequest request) {
+    public ResponseEntity<Response<Void>> handleResourceNotFound(ResourceNotFoundException ex, WebRequest request) {
 
         Response<Void> resposta = new Response<>(
                 "error",
@@ -76,9 +72,22 @@ public class GlobalExceptionHandler {
                 null
         );
 
-        return ResponseEntity.status(HttpStatus.NOT_FOUND)
-                .body(resposta);
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(resposta);
+
     }
-    
-    
+
+    @ExceptionHandler(DataIntegrityViolationException.class)
+    public ResponseEntity<Response<Void>> handleDataIntegrityViolation(DataIntegrityViolationException ex, WebRequest request) {
+
+        Response<Void> resposta = new Response<>(
+                "error",
+                "O registro informado já existe ou viola uma restrição do banco de dados.",
+                null
+        );
+
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(resposta);
+
+    }
+
+
 }

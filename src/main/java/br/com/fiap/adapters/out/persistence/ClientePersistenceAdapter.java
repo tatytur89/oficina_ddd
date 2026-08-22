@@ -45,7 +45,8 @@ public class ClientePersistenceAdapter implements ClienteRepositoryPort {
                 .toList();
     }
     
-        public Optional<Cliente> buscarPorId(Long id) {
+    @Override
+    public Optional<Cliente> buscarPorId(Long id) {
     	return jpaRepository.findById(id).map(this::mapearParaDominio);
     }
     

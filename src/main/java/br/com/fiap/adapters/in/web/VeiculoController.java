@@ -11,6 +11,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import br.com.fiap.adapters.in.web.mapper.VeiculoMapper;
 import br.com.fiap.domain.entities.Veiculo;
 import br.com.fiap.ports.in.VeiculoUseCase;
 import io.swagger.v3.oas.annotations.Operation;
@@ -93,20 +94,12 @@ public class VeiculoController {
                 required = true
             )
             @Valid @RequestBody VeiculoRequestDTO requestDTO) {
-        
-        Veiculo veiculoDomain = new Veiculo(
-            null,
-            requestDTO.getMarca(),
-            requestDTO.getModelo(),
-            requestDTO.getAno(),
-            requestDTO.getPlaca(),
-            requestDTO.getClienteId()
-        );
+
+        Veiculo veiculoDomain = VeiculoMapper.toDomain(null, requestDTO);
 
         Veiculo veiculoSalvo = veiculoUseCase.cadastrarVeiculo(veiculoDomain);
-        VeiculoResponseDTO responseDTO = new VeiculoResponseDTO(veiculoSalvo);
 
-        return ResponseEntity.status(HttpStatus.CREATED).body(responseDTO);
+        return ResponseEntity.status(HttpStatus.CREATED).body(VeiculoMapper.toResponse(veiculoSalvo));
     }
 
     @Operation(
@@ -127,11 +120,7 @@ public class VeiculoController {
     public ResponseEntity<List<VeiculoResponseDTO>> listarTodos() {
         List<Veiculo> veiculos = veiculoUseCase.listarTodos();
 
-        List<VeiculoResponseDTO> responseDTOs = veiculos.stream()
-                .map(VeiculoResponseDTO::new)
-                .toList();
-
-        return ResponseEntity.ok(responseDTOs);
+        return ResponseEntity.ok(VeiculoMapper.toResponseList(veiculos));
     }
 
     @Operation(
@@ -156,14 +145,10 @@ public class VeiculoController {
                 required = true
             )
             @PathVariable Long clienteId) {
-        
+
         List<Veiculo> veiculos = veiculoUseCase.listarPorCliente(clienteId);
 
-        List<VeiculoResponseDTO> responseDTOs = veiculos.stream()
-                .map(VeiculoResponseDTO::new)
-                .toList();
-
-        return ResponseEntity.ok(responseDTOs);
+        return ResponseEntity.ok(VeiculoMapper.toResponseList(veiculos));
     }
 
     @Operation(
@@ -200,9 +185,9 @@ public class VeiculoController {
                 required = true
             )
             @PathVariable String placa) {
-        
+
         return veiculoUseCase.buscarPorPlaca(placa)
-                .map(veiculo -> ResponseEntity.ok(new VeiculoResponseDTO(veiculo)))
+                .map(veiculo -> ResponseEntity.ok(VeiculoMapper.toResponse(veiculo)))
                 .orElse(ResponseEntity.notFound().build());
     }
 }

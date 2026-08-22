@@ -16,6 +16,13 @@ public class Cliente {
         this.email = email;
         this.telefone = telefone;
     }
+    
+    public void atualizarDados(String nome, String documento, String email, String telefone) {
+        this.nome = nome;
+        this.documento = new Documento(documento);
+        this.email = email;
+        this.telefone = telefone;
+    }
 
     public Long getId() {
         return id;
