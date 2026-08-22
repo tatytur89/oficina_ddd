@@ -264,11 +264,15 @@
         },
         {
           "name": "Atualizar status da OS",
-          "request": {"method": "PATCH", "url": {"raw": "http://localhost:8089/api/v1/os/1/status/EM_ANDAMENTO", "host": ["http://localhost:8089"], "path": ["api", "v1", "os", "1", "status", "EM_ANDAMENTO"]}}
+          "request": {"method": "PATCH", "url": {"raw": "http://localhost:8089/api/v1/os/1/status/EM_DIAGNOSTICO", "host": ["http://localhost:8089"], "path": ["api", "v1", "os", "1", "status", "EM_DIAGNOSTICO"]}}
         },
         {
           "name": "Acompanhar OS (publico)",
           "request": {"method": "GET", "auth": {"type": "noauth"}, "url": {"raw": "http://localhost:8089/api/v1/os/1/acompanhar", "host": ["http://localhost:8089"], "path": ["api", "v1", "os", "1", "acompanhar"]}}
+        },
+        {
+          "name": "Tempo medio de execucao",
+          "request": {"method": "GET", "url": {"raw": "http://localhost:8089/api/v1/os/metricas/tempo-medio-execucao", "host": ["http://localhost:8089"], "path": ["api", "v1", "os", "metricas", "tempo-medio-execucao"]}}
         }
       ]
     }

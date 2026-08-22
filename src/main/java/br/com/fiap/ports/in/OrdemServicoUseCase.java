@@ -15,4 +15,5 @@ public interface OrdemServicoUseCase {
     List<OrdemServico> listarPorPeriodo(LocalDateTime inicio, LocalDateTime fim);
     OrdemServico atualizarStatus(Long id, StatusOS novoStatus);
     OrdemServico enviarOrcamento(Long id);
+    TempoMedioExecucao calcularTempoMedioExecucao();
 }

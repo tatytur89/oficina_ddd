@@ -8,9 +8,12 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import br.com.fiap.application.exceptions.ResourceAlreadyExistsException;
+import br.com.fiap.application.exceptions.ResourceInUseException;
 import br.com.fiap.application.exceptions.ResourceNotFoundException;
+import br.com.fiap.domain.entities.OrdemServico;
 import br.com.fiap.domain.entities.Peca;
 import br.com.fiap.domain.valueobjects.Preco;
+import br.com.fiap.ports.out.OrdemServicoRepositoryPort;
 import br.com.fiap.ports.out.PecaRepositoryPort;
 
 import java.math.BigDecimal;
@@ -19,6 +22,7 @@ import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -26,6 +30,9 @@ class PecaServiceTest {
 
     @Mock
     private PecaRepositoryPort repositoryPort;
+
+    @Mock
+    private OrdemServicoRepositoryPort osRepositoryPort;
 
     @InjectMocks
     private PecaService pecaService;
@@ -255,5 +262,17 @@ class PecaServiceTest {
     void deveLancarIllegalArgumentExceptionAoExcluirSemId() {
         assertThrows(IllegalArgumentException.class, () -> pecaService.excluirPeca(null));
         verify(repositoryPort, never()).buscarPorId(any());
+    }
+
+    @Test
+    @DisplayName("Deve lançar ResourceInUseException ao excluir peça vinculada a OS pendente de execução")
+    void deveLancarResourceInUseExceptionAoExcluirPecaComOSPendente() {
+        Peca pecaExistente = novaPeca(1L, "FIL001", 50, 10);
+        OrdemServico os = new OrdemServico(1L, 1L, 1L, null, null, null, null, "obs", null, null, null, null, null);
+        when(repositoryPort.buscarPorId(1L)).thenReturn(Optional.of(pecaExistente));
+        when(osRepositoryPort.buscarPorPecaIdEStatus(eq(1L), any())).thenReturn(List.of(os));
+
+        assertThrows(ResourceInUseException.class, () -> pecaService.excluirPeca(1L));
+        verify(repositoryPort, never()).excluirPorId(any());
     }
 }

@@ -1,6 +1,7 @@
 package br.com.fiap.application.services;
 
 import java.math.BigDecimal;
+import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.List;
 
@@ -10,15 +11,17 @@ import org.springframework.transaction.annotation.Transactional;
 import br.com.fiap.application.exceptions.ResourceNotFoundException;
 import br.com.fiap.domain.entities.OrdemServico;
 import br.com.fiap.domain.entities.Peca;
+import br.com.fiap.domain.entities.PecaOS;
 import br.com.fiap.domain.entities.Servico;
 import br.com.fiap.domain.valueobjects.Preco;
 import br.com.fiap.domain.valueobjects.StatusOS;
 import br.com.fiap.ports.in.ItemQuantidade;
 import br.com.fiap.ports.in.OrdemServicoUseCase;
+import br.com.fiap.ports.in.PecaUseCase;
+import br.com.fiap.ports.in.ServicoUseCase;
+import br.com.fiap.ports.in.TempoMedioExecucao;
 import br.com.fiap.ports.out.ClienteRepositoryPort;
 import br.com.fiap.ports.out.OrdemServicoRepositoryPort;
-import br.com.fiap.ports.out.PecaRepositoryPort;
-import br.com.fiap.ports.out.ServicoRepositoryPort;
 import br.com.fiap.ports.out.VeiculoRepositoryPort;
 
 @Service
@@ -27,19 +30,19 @@ public class OrdemServicoService implements OrdemServicoUseCase {
     private final OrdemServicoRepositoryPort osRepositoryPort;
     private final ClienteRepositoryPort clienteRepositoryPort;
     private final VeiculoRepositoryPort veiculoRepositoryPort;
-    private final ServicoRepositoryPort servicoRepositoryPort;
-    private final PecaRepositoryPort pecaRepositoryPort;
+    private final ServicoUseCase servicoUseCase;
+    private final PecaUseCase pecaUseCase;
 
     public OrdemServicoService(OrdemServicoRepositoryPort osRepositoryPort,
                                 ClienteRepositoryPort clienteRepositoryPort,
                                 VeiculoRepositoryPort veiculoRepositoryPort,
-                                ServicoRepositoryPort servicoRepositoryPort,
-                                PecaRepositoryPort pecaRepositoryPort) {
+                                ServicoUseCase servicoUseCase,
+                                PecaUseCase pecaUseCase) {
         this.osRepositoryPort = osRepositoryPort;
         this.clienteRepositoryPort = clienteRepositoryPort;
         this.veiculoRepositoryPort = veiculoRepositoryPort;
-        this.servicoRepositoryPort = servicoRepositoryPort;
-        this.pecaRepositoryPort = pecaRepositoryPort;
+        this.servicoUseCase = servicoUseCase;
+        this.pecaUseCase = pecaUseCase;
     }
 
     @Override
@@ -69,16 +72,14 @@ public class OrdemServicoService implements OrdemServicoUseCase {
 
         if (servicosSolicitados != null) {
             for (ItemQuantidade item : servicosSolicitados) {
-                Servico servico = servicoRepositoryPort.buscarPorId(item.id())
-                        .orElseThrow(() -> new ResourceNotFoundException("Serviço não encontrado com ID: " + item.id()));
+                Servico servico = servicoUseCase.buscarPorId(item.id());
                 novaOS.adicionarServico(servico, item.quantidade());
             }
         }
 
         if (pecasSolicitadas != null) {
             for (ItemQuantidade item : pecasSolicitadas) {
-                Peca peca = pecaRepositoryPort.buscarPorId(item.id())
-                        .orElseThrow(() -> new ResourceNotFoundException("Peça não encontrada com ID: " + item.id()));
+                Peca peca = pecaUseCase.buscarPorId(item.id());
                 novaOS.adicionarPeca(peca, item.quantidade());
             }
         }
@@ -125,6 +126,13 @@ public class OrdemServicoService implements OrdemServicoUseCase {
             .orElseThrow(() -> new ResourceNotFoundException("OS não encontrada com ID: " + id));
 
         os.transicionarPara(novoStatus);
+
+        if (novoStatus == StatusOS.EM_EXECUCAO) {
+            for (PecaOS item : os.getPecas()) {
+                pecaUseCase.baixarEstoque(item.getPecaId(), item.getQuantidade());
+            }
+        }
+
         return osRepositoryPort.salvar(os);
     }
 
@@ -136,5 +144,23 @@ public class OrdemServicoService implements OrdemServicoUseCase {
 
         os.enviarOrcamento();
         return osRepositoryPort.salvar(os);
+    }
+
+    @Override
+    public TempoMedioExecucao calcularTempoMedioExecucao() {
+        List<OrdemServico> concluidas = osRepositoryPort.buscarTodas().stream()
+                .filter(os -> os.getDataConclusao() != null)
+                .toList();
+
+        if (concluidas.isEmpty()) {
+            return new TempoMedioExecucao(0.0, 0);
+        }
+
+        double mediaMinutos = concluidas.stream()
+                .mapToLong(os -> Duration.between(os.getDataAbertura(), os.getDataConclusao()).toMinutes())
+                .average()
+                .orElse(0.0);
+
+        return new TempoMedioExecucao(mediaMinutos, concluidas.size());
     }
 }

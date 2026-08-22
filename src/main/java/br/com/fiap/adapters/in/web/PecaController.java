@@ -180,7 +180,9 @@ public class PecaController {
     @ApiResponses(value = {
         @ApiResponse(responseCode = "200", description = "Peça excluída com sucesso"),
         @ApiResponse(responseCode = "404", description = "Peça não encontrada", content = @Content(
-            examples = @ExampleObject(value = "{\"status\": \"error\", \"message\": \"Peça não encontrada com ID: 1\", \"dados\": null}")))
+            examples = @ExampleObject(value = "{\"status\": \"error\", \"message\": \"Peça não encontrada com ID: 1\", \"dados\": null}"))),
+        @ApiResponse(responseCode = "409", description = "Peça vinculada a ordens de serviço pendentes de execução", content = @Content(
+            examples = @ExampleObject(value = "{\"status\": \"error\", \"message\": \"Peça está vinculada a ordens de serviço pendentes de execução e não pode ser excluída.\", \"dados\": null}")))
     })
     @DeleteMapping("/{id}")
     public ResponseEntity<Response<Void>> excluir(

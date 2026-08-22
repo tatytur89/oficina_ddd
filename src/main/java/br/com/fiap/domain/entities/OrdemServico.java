@@ -44,7 +44,7 @@ public class OrdemServico {
     }
 
     public void adicionarServico(Servico servico, int quantidade) {
-        if (status != StatusOS.RECEBIDA && status != StatusOS.EM_ANDAMENTO) {
+        if (status != StatusOS.RECEBIDA && status != StatusOS.EM_DIAGNOSTICO) {
             throw new IllegalStateException("Não é possível adicionar serviços neste status.");
         }
         Preco valorItem = servico.getPreco().multiplicar(quantidade);
@@ -53,7 +53,7 @@ public class OrdemServico {
     }
 
     public void adicionarPeca(Peca peca, int quantidade) {
-        if (status != StatusOS.RECEBIDA && status != StatusOS.EM_ANDAMENTO) {
+        if (status != StatusOS.RECEBIDA && status != StatusOS.EM_DIAGNOSTICO) {
             throw new IllegalStateException("Não é possível adicionar peças neste status.");
         }
         Preco valorItem = peca.getPreco().multiplicar(quantidade);
@@ -62,49 +62,13 @@ public class OrdemServico {
     }
 
     public void enviarOrcamento() {
-        if (status != StatusOS.EM_ANDAMENTO) {
-            throw new IllegalStateException("A OS deve estar Em Andamento para enviar orçamento.");
+        if (status != StatusOS.EM_DIAGNOSTICO) {
+            throw new IllegalStateException("A OS deve estar Em Diagnóstico para enviar orçamento.");
         }
         if (servicos.isEmpty()) {
             throw new IllegalStateException("A OS deve ter pelo menos um serviço para enviar orçamento.");
         }
         this.status = StatusOS.AGUARDANDO_APROVACAO;
-    }
-
-    public void aprovar() {
-        if (status != StatusOS.AGUARDANDO_APROVACAO) {
-            throw new IllegalStateException("A OS deve estar Aguardando Aprovação para ser aprovada.");
-        }
-        this.status = StatusOS.APROVADA;
-    }
-
-    public void iniciarExecucao() {
-        if (status != StatusOS.APROVADA) {
-            throw new IllegalStateException("A OS deve estar Aprovada para iniciar execução.");
-        }
-        this.status = StatusOS.EM_EXECUCAO;
-    }
-
-    public void concluir() {
-        if (status != StatusOS.EM_EXECUCAO) {
-            throw new IllegalStateException("A OS deve estar Em Execução para ser concluída.");
-        }
-        this.status = StatusOS.CONCLUIDA;
-        this.dataConclusao = LocalDateTime.now();
-    }
-
-    public void entregar() {
-        if (status != StatusOS.CONCLUIDA) {
-            throw new IllegalStateException("A OS deve estar Concluída para ser entregue.");
-        }
-        this.status = StatusOS.ENTREGUE;
-    }
-
-    public void cancelar() {
-        if (!status.podeTransicionarPara(StatusOS.CANCELADA)) {
-            throw new IllegalStateException("A OS não pode ser cancelada neste status.");
-        }
-        this.status = StatusOS.CANCELADA;
     }
 
     public void transicionarPara(StatusOS novoStatus) {
@@ -115,7 +79,7 @@ public class OrdemServico {
             );
         }
         this.status = novoStatus;
-        if (novoStatus == StatusOS.CONCLUIDA) {
+        if (novoStatus == StatusOS.FINALIZADA) {
             this.dataConclusao = LocalDateTime.now();
         }
     }

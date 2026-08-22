@@ -18,6 +18,7 @@ import org.springframework.web.bind.annotation.RestController;
 import br.com.fiap.adapters.in.web.DTO.Dados.Response;
 import br.com.fiap.adapters.in.web.DTO.OrdemServico.OrdemServicoCreateRequest;
 import br.com.fiap.adapters.in.web.DTO.OrdemServico.OrdemServicoResponse;
+import br.com.fiap.adapters.in.web.DTO.OrdemServico.TempoMedioExecucaoResponse;
 import br.com.fiap.adapters.in.web.mapper.OrdemServicoMapper;
 import br.com.fiap.domain.entities.OrdemServico;
 import br.com.fiap.domain.valueobjects.StatusOS;
@@ -57,7 +58,7 @@ public class OrdemServicoController {
 
             **Máquina de estados:**
             ```
-            RECEBIDA → EM_ANDAMENTO → AGUARDANDO_APROVACAO → APROVADA → EM_EXECUCAO → CONCLUIDA → ENTREGUE
+            RECEBIDA → EM_DIAGNOSTICO → AGUARDANDO_APROVACAO → EM_EXECUCAO → FINALIZADA → ENTREGUE
             ```
             """
     )
@@ -176,13 +177,11 @@ public class OrdemServicoController {
 
             **Status disponíveis:**
             - RECEBIDA - OS acabou de ser criada
-            - EM_ANDAMENTO - OS em análise/andamento
+            - EM_DIAGNOSTICO - OS em análise/diagnóstico
             - AGUARDANDO_APROVACAO - Orçamento enviado para aprovação
-            - APROVADA - Cliente aprovou o orçamento
-            - EM_EXECUCAO - Serviço em execução
-            - CONCLUIDA - Serviço concluído
+            - EM_EXECUCAO - Serviço em execução (baixa o estoque das peças vinculadas)
+            - FINALIZADA - Serviço finalizado
             - ENTREGUE - Veículo entregue ao cliente
-            - CANCELADA - OS cancelada
             """
     )
     @ApiResponses(value = {
@@ -230,7 +229,7 @@ public class OrdemServicoController {
             Transiciona a OS para o status `AGUARDANDO_APROVACAO`.
 
             **Regras:**
-            - A OS deve estar com status `EM_ANDAMENTO`
+            - A OS deve estar com status `EM_DIAGNOSTICO`
             - Deve ter pelo menos um serviço vinculado
             - O orçamento é calculado automaticamente
             """
@@ -251,7 +250,7 @@ public class OrdemServicoController {
                 }
                 """))),
         @ApiResponse(responseCode = "400", description = "Transição de status inválida", content = @Content(
-            examples = @ExampleObject(value = "{\"status\": \"error\", \"message\": \"A OS deve estar Em Andamento para enviar orçamento.\", \"dados\": null}"))),
+            examples = @ExampleObject(value = "{\"status\": \"error\", \"message\": \"A OS deve estar Em Diagnóstico para enviar orçamento.\", \"dados\": null}"))),
         @ApiResponse(responseCode = "404", description = "OS não encontrada", content = @Content(
             examples = @ExampleObject(value = "{\"status\": \"error\", \"message\": \"OS não encontrada com ID: 1\", \"dados\": null}")))
     })
@@ -271,16 +270,16 @@ public class OrdemServicoController {
             Atualiza o status da OS conforme a máquina de estados definida.
 
             **Transições válidas:**
-            | Status Atual | Próximos Status Válidos |
+            | Status Atual | Próximo Status Válido |
             |---|---|
-            | RECEBIDA | EM_ANDAMENTO, CANCELADA |
-            | EM_ANDAMENTO | AGUARDANDO_APROVACAO, CANCELADA |
-            | AGUARDANDO_APROVACAO | APROVADA, CANCELADA |
-            | APROVADA | EM_EXECUCAO, CANCELADA |
-            | EM_EXECUCAO | CONCLUIDA |
-            | CONCLUIDA | ENTREGUE |
+            | RECEBIDA | EM_DIAGNOSTICO |
+            | EM_DIAGNOSTICO | AGUARDANDO_APROVACAO |
+            | AGUARDANDO_APROVACAO | EM_EXECUCAO |
+            | EM_EXECUCAO | FINALIZADA |
+            | FINALIZADA | ENTREGUE |
             | ENTREGUE | *(nenhum)* |
-            | CANCELADA | *(nenhum)* |
+
+            Ao transicionar para `EM_EXECUCAO`, o estoque de cada peça vinculada à OS é baixado automaticamente.
             """
     )
     @ApiResponses(value = {
@@ -339,5 +338,33 @@ public class OrdemServicoController {
         OrdemServico os = osUseCase.buscarPorId(id);
 
         return ResponseEntity.ok(new Response<>("success", "Progresso retornado com sucesso", OrdemServicoMapper.toResponse(os)));
+    }
+
+    @Operation(
+        summary = "Monitorar tempo médio de execução das OS",
+        description = """
+            Calcula o tempo médio (em minutos) decorrido entre a abertura e a conclusão das ordens de serviço já finalizadas (status `FINALIZADA` ou `ENTREGUE`).
+
+            **Uso:** Indicador administrativo de eficiência do atendimento.
+            """
+    )
+    @ApiResponses(value = {
+        @ApiResponse(responseCode = "200", description = "Tempo médio calculado com sucesso", content = @Content(
+            examples = @ExampleObject(value = """
+                {
+                    "status": "success",
+                    "message": "Tempo médio de execução calculado com sucesso",
+                    "dados": {
+                        "tempoMedioMinutos": 182.5,
+                        "quantidadeOSConsideradas": 12
+                    }
+                }
+                """)))
+    })
+    @GetMapping("/metricas/tempo-medio-execucao")
+    public ResponseEntity<Response<TempoMedioExecucaoResponse>> tempoMedioExecucao() {
+        TempoMedioExecucaoResponse response = new TempoMedioExecucaoResponse(osUseCase.calcularTempoMedioExecucao());
+
+        return ResponseEntity.ok(new Response<>("success", "Tempo médio de execução calculado com sucesso", response));
     }
 }

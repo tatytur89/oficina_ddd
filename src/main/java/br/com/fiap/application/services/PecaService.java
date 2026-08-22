@@ -7,18 +7,26 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import br.com.fiap.application.exceptions.ResourceAlreadyExistsException;
+import br.com.fiap.application.exceptions.ResourceInUseException;
 import br.com.fiap.application.exceptions.ResourceNotFoundException;
 import br.com.fiap.domain.entities.Peca;
+import br.com.fiap.domain.valueobjects.StatusOS;
 import br.com.fiap.ports.in.PecaUseCase;
+import br.com.fiap.ports.out.OrdemServicoRepositoryPort;
 import br.com.fiap.ports.out.PecaRepositoryPort;
 
 @Service
 public class PecaService implements PecaUseCase {
 
-    private final PecaRepositoryPort pecaRepositoryPort;
+    private static final List<StatusOS> STATUS_PENDENTES_DE_EXECUCAO =
+            List.of(StatusOS.RECEBIDA, StatusOS.EM_DIAGNOSTICO, StatusOS.AGUARDANDO_APROVACAO);
 
-    public PecaService(PecaRepositoryPort pecaRepositoryPort) {
+    private final PecaRepositoryPort pecaRepositoryPort;
+    private final OrdemServicoRepositoryPort osRepositoryPort;
+
+    public PecaService(PecaRepositoryPort pecaRepositoryPort, OrdemServicoRepositoryPort osRepositoryPort) {
         this.pecaRepositoryPort = pecaRepositoryPort;
+        this.osRepositoryPort = osRepositoryPort;
     }
 
     @Override
@@ -114,6 +122,10 @@ public class PecaService implements PecaUseCase {
 
         pecaRepositoryPort.buscarPorId(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Peça não encontrada com ID: " + id));
+
+        if (!osRepositoryPort.buscarPorPecaIdEStatus(id, STATUS_PENDENTES_DE_EXECUCAO).isEmpty()) {
+            throw new ResourceInUseException("Peça está vinculada a ordens de serviço pendentes de execução e não pode ser excluída.");
+        }
 
         pecaRepositoryPort.excluirPorId(id);
     }

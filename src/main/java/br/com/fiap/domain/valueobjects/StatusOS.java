@@ -1,17 +1,14 @@
 package br.com.fiap.domain.valueobjects;
 
-import java.util.Arrays;
 import java.util.List;
 
 public enum StatusOS {
     RECEBIDA("Recebida"),
-    EM_ANDAMENTO("Em Andamento"),
-    AGUARDANDO_APROVACAO("Aguardando Aprovação"),
-    APROVADA("Aprovada"),
-    EM_EXECUCAO("Em Execução"),
-    CONCLUIDA("Concluída"),
-    ENTREGUE("Entregue"),
-    CANCELADA("Cancelada");
+    EM_DIAGNOSTICO("Em diagnóstico"),
+    AGUARDANDO_APROVACAO("Aguardando aprovação"),
+    EM_EXECUCAO("Em execução"),
+    FINALIZADA("Finalizada"),
+    ENTREGUE("Entregue");
 
     private final String descricao;
 
@@ -25,14 +22,12 @@ public enum StatusOS {
 
     public List<StatusOS> proximosStatusValidos() {
         return switch (this) {
-            case RECEBIDA -> List.of(EM_ANDAMENTO, CANCELADA);
-            case EM_ANDAMENTO -> List.of(AGUARDANDO_APROVACAO, CANCELADA);
-            case AGUARDANDO_APROVACAO -> List.of(APROVADA, CANCELADA);
-            case APROVADA -> List.of(EM_EXECUCAO, CANCELADA);
-            case EM_EXECUCAO -> List.of(CONCLUIDA);
-            case CONCLUIDA -> List.of(ENTREGUE);
+            case RECEBIDA -> List.of(EM_DIAGNOSTICO);
+            case EM_DIAGNOSTICO -> List.of(AGUARDANDO_APROVACAO);
+            case AGUARDANDO_APROVACAO -> List.of(EM_EXECUCAO);
+            case EM_EXECUCAO -> List.of(FINALIZADA);
+            case FINALIZADA -> List.of(ENTREGUE);
             case ENTREGUE -> List.of();
-            case CANCELADA -> List.of();
         };
     }
 
