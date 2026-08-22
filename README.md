@@ -348,3 +348,7 @@ RECEBIDA → EM_DIAGNOSTICO → AGUARDANDO_APROVACAO → EM_EXECUCAO → FINALIZ
 ## Coleção Postman
 
 Uma coleção pronta para uso está disponível em [`postman/Oficina-DDD.postman_collection.json`](postman/Oficina-DDD.postman_collection.json), organizada em pastas por entidade (Autenticação, Cliente, Veículo, Serviço, Peça, Ordem de Serviço). O login salva o token automaticamente na variável de coleção para uso nas demais requisições.
+
+## Decisões arquiteturais
+
+O documento [`docs/DECISOES_ARQUITETURAIS.md`](docs/DECISOES_ARQUITETURAIS.md) justifica, no formato de ADR (contexto, decisão, justificativa e alternativas consideradas), cada escolha estrutural relevante do projeto: arquitetura hexagonal, escolha do PostgreSQL, autenticação JWT, máquina de estados da OS, snapshots desnormalizados, tratamento de erro centralizado, DTOs como records, integridade referencial na camada de aplicação, ponto de baixa de estoque e estratégia de testes por camada.
