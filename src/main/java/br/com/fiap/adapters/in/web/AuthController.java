@@ -6,6 +6,8 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import br.com.fiap.adapters.in.web.DTO.Auth.LoginRequest;
+import br.com.fiap.adapters.in.web.DTO.Auth.TokenResponse;
 import br.com.fiap.adapters.in.web.DTO.Dados.Response;
 import br.com.fiap.ports.in.AuthUseCase;
 import io.swagger.v3.oas.annotations.Operation;
@@ -68,15 +70,15 @@ public class AuthController {
             examples = @ExampleObject(value = "{\"status\": \"error\", \"message\": \"Credenciais inválidas\", \"dados\": null}")))
     })
     @PostMapping("/login")
-    public ResponseEntity<Response<TokenResponseDTO>> login(
+    public ResponseEntity<Response<TokenResponse>> login(
             @io.swagger.v3.oas.annotations.parameters.RequestBody(
                 description = "Credenciais de acesso",
                 required = true
             )
-            @Valid @RequestBody LoginRequestDTO request) {
+            @Valid @RequestBody LoginRequest request) {
 
-        String token = authUseCase.autenticar(request.getUsuario(), request.getSenha());
+        String token = authUseCase.autenticar(request.usuario(), request.senha());
 
-        return ResponseEntity.ok(new Response<>("success", "Autenticação realizada com sucesso", new TokenResponseDTO(token)));
+        return ResponseEntity.ok(new Response<>("success", "Autenticação realizada com sucesso", new TokenResponse(token)));
     }
 }
