@@ -60,6 +60,17 @@ public class VeiculoPersistenceAdapter implements VeiculoRepositoryPort {
                 .map(this::mapearParaDominio);
     }
 
+    @Override
+    public Optional<Veiculo> buscarPorId(Long id) {
+        return jpaRepository.findById(id)
+                .map(this::mapearParaDominio);
+    }
+
+    @Override
+    public void excluirPorId(Long id) {
+        jpaRepository.deleteById(id);
+    }
+
     private Veiculo mapearParaDominio(VeiculoJpaEntity entity) {
         return new Veiculo(
             entity.getId(),

@@ -10,4 +10,6 @@ public interface VeiculoRepositoryPort {
     List<Veiculo> buscarTodos();
     List<Veiculo> buscarPorClienteId(Long clienteId);
     Optional<Veiculo> buscarPorPlaca(String placa);
+    Optional<Veiculo> buscarPorId(Long id);
+    void excluirPorId(Long id);
 }
