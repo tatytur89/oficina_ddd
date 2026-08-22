@@ -1,7 +1,5 @@
 package br.com.fiap.adapters.in.web;
 
-import java.time.LocalDateTime;
-
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.MethodArgumentNotValidException;
@@ -9,49 +7,78 @@ import org.springframework.web.bind.annotation.ControllerAdvice;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.context.request.WebRequest;
 
+import br.com.fiap.adapters.in.web.DTO.Dados.Response;
 import br.com.fiap.application.exceptions.ResourceAlreadyExistsException;
+import br.com.fiap.application.exceptions.ResourceNotFoundException;
 
 @ControllerAdvice
 public class GlobalExceptionHandler {
 
-    @ExceptionHandler(IllegalArgumentException.class)
-    public ResponseEntity<ApiErrorResponse> handleIllegalArgument(IllegalArgumentException ex,
-        WebRequest request) {
-    ApiErrorResponse error = new ApiErrorResponse(
-        LocalDateTime.now(),
-        HttpStatus.BAD_REQUEST.value(),
-        HttpStatus.BAD_REQUEST.getReasonPhrase(),
-        ex.getMessage(),
-        request.getDescription(false).replace("uri=", ""));
-    return ResponseEntity.badRequest().body(error);
-    }
+	@ExceptionHandler(IllegalArgumentException.class)
+	public ResponseEntity<Response<Void>> handleIllegalArgument(
+	        IllegalArgumentException ex,
+	        WebRequest request) {
+
+	    Response<Void> resposta = new Response<>(
+	            "error",
+	            ex.getMessage(),
+	            null
+	    );
+
+	    return ResponseEntity.badRequest().body(resposta);
+	}
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
-    public ResponseEntity<ApiErrorResponse> handleValidation(MethodArgumentNotValidException ex,
-        WebRequest request) {
-    String message = ex.getBindingResult().getFieldErrors().stream()
-        .map(fieldError -> fieldError.getField() + ": " + fieldError.getDefaultMessage())
-        .findFirst()
-        .orElse("Dados inválidos");
-
-    ApiErrorResponse error = new ApiErrorResponse(
-        LocalDateTime.now(),
-        HttpStatus.BAD_REQUEST.value(),
-        HttpStatus.BAD_REQUEST.getReasonPhrase(),
-        message,
-        request.getDescription(false).replace("uri=", ""));
-    return ResponseEntity.badRequest().body(error);
-    }
-
-    @ExceptionHandler(ResourceAlreadyExistsException.class)
-    public ResponseEntity<ApiErrorResponse> handleResourceAlreadyExists(ResourceAlreadyExistsException ex,
+    public ResponseEntity<Response<Void>> handleValidation(
+            MethodArgumentNotValidException ex,
             WebRequest request) {
-        ApiErrorResponse error = new ApiErrorResponse(
-                LocalDateTime.now(),
-                HttpStatus.CONFLICT.value(),
-                HttpStatus.CONFLICT.getReasonPhrase(),
-                ex.getMessage(),
-                request.getDescription(false).replace("uri=", ""));
-        return ResponseEntity.status(HttpStatus.CONFLICT).body(error);
+
+        String mensagem = ex.getBindingResult()
+                .getFieldErrors()
+                .stream()
+                .map(error ->
+                        error.getField() + ": " + error.getDefaultMessage()
+                )
+                .findFirst()
+                .orElse("Dados inválidos");
+
+        Response<Void> resposta = new Response<>(
+                "error",
+                mensagem,
+                null
+        );
+
+        return ResponseEntity.badRequest().body(resposta);
     }
+
+    public ResponseEntity<Response<Void>> handleResourceAlreadyExists(
+            ResourceAlreadyExistsException ex,
+            WebRequest request) {
+
+        Response<Void> resposta = new Response<>(
+                "error",
+                ex.getMessage(),
+                null
+        );
+
+        return ResponseEntity.status(HttpStatus.CONFLICT)
+                .body(resposta);
+    }
+    
+    @ExceptionHandler(ResourceNotFoundException.class)
+    public ResponseEntity<Response<Void>> handleResourceNotFound(
+            ResourceNotFoundException ex,
+            WebRequest request) {
+
+        Response<Void> resposta = new Response<>(
+                "error",
+                ex.getMessage(),
+                null
+        );
+
+        return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                .body(resposta);
+    }
+    
+    
 }

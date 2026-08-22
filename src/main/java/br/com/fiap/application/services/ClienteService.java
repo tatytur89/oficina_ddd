@@ -6,6 +6,7 @@ import java.util.Optional;
 import org.springframework.stereotype.Service;
 
 import br.com.fiap.application.exceptions.ResourceAlreadyExistsException;
+import br.com.fiap.application.exceptions.ResourceNotFoundException;
 import br.com.fiap.domain.entities.Cliente;
 import br.com.fiap.ports.in.ClienteUseCase;
 import br.com.fiap.ports.out.ClienteRepositoryPort;
@@ -34,13 +35,17 @@ public class ClienteService implements ClienteUseCase {
     }
 
     @Override
-    public Optional<Cliente> buscarPorDocumento(String documento) {
+    public Cliente buscarPorDocumento(String documento) {
+    	
         if (documento == null || documento.isBlank()) {
             throw new IllegalArgumentException("O documento para busca não pode ser nulo ou vazio");
         }
-        // Garante a busca apenas pelos números, limpando máscaras de CPF/CNPJ
+        
         String documentoLimpo = documento.replaceAll("\\D", "");
-        return clienteRepositoryPort.buscarPorDocumento(documentoLimpo);
+        
+        return clienteRepositoryPort.buscarPorDocumento(documentoLimpo).orElseThrow(() ->
+                        new ResourceNotFoundException("Cliente não encontrado"));
+        
     }
 
 	@Override
