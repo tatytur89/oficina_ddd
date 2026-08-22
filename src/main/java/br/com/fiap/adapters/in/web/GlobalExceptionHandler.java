@@ -25,7 +25,20 @@ public class GlobalExceptionHandler {
 	    );
 
 	    return ResponseEntity.badRequest().body(resposta);
-	    
+
+	}
+
+	@ExceptionHandler(IllegalStateException.class)
+	public ResponseEntity<Response<Void>> handleIllegalState(IllegalStateException ex, WebRequest request) {
+
+	    Response<Void> resposta = new Response<>(
+	            "error",
+	            ex.getMessage(),
+	            null
+	    );
+
+	    return ResponseEntity.badRequest().body(resposta);
+
 	}
 
     @ExceptionHandler(MethodArgumentNotValidException.class)

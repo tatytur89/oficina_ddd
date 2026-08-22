@@ -61,6 +61,11 @@ public class PecaPersistenceAdapter implements PecaRepositoryPort {
                 .toList();
     }
 
+    @Override
+    public void excluirPorId(Long id) {
+        jpaRepository.deleteById(id);
+    }
+
     private Peca mapearParaDominio(PecaJpaEntity entity) {
         return new Peca(
             entity.getId(),

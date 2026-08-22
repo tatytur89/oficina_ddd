@@ -55,6 +55,17 @@ public class ServicoPersistenceAdapter implements ServicoRepositoryPort {
                 .map(this::mapearParaDominio);
     }
 
+    @Override
+    public Optional<Servico> buscarPorNome(String nome) {
+        return jpaRepository.findByNome(nome)
+                .map(this::mapearParaDominio);
+    }
+
+    @Override
+    public void excluirPorId(Long id) {
+        jpaRepository.deleteById(id);
+    }
+
     private Servico mapearParaDominio(ServicoJpaEntity entity) {
         return new Servico(
             entity.getId(),

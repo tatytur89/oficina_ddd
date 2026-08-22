@@ -2,14 +2,13 @@ package br.com.fiap.ports.in;
 
 import java.time.LocalDateTime;
 import java.util.List;
-import java.util.Optional;
 
 import br.com.fiap.domain.entities.OrdemServico;
 import br.com.fiap.domain.valueobjects.StatusOS;
 
 public interface OrdemServicoUseCase {
-    OrdemServico criarOS(OrdemServico os);
-    Optional<OrdemServico> buscarPorId(Long id);
+    OrdemServico criarOS(OrdemServico os, List<ItemQuantidade> servicos, List<ItemQuantidade> pecas);
+    OrdemServico buscarPorId(Long id);
     List<OrdemServico> listarTodas();
     List<OrdemServico> listarPorCliente(Long clienteId);
     List<OrdemServico> listarPorStatus(StatusOS status);

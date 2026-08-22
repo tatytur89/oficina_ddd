@@ -62,7 +62,7 @@
       ]
     },
     {
-      "name": "Cadastros",
+      "name": "Cliente",
       "item": [
         {
           "name": "Cadastrar cliente",
@@ -83,8 +83,26 @@
         },
         {
           "name": "Buscar cliente por documento",
-          "request": {"method": "GET", "url": {"raw": "http://localhost:8089/api/v1/clientes/documento/12345678909", "host": ["http://localhost:8089"], "path": ["api", "v1", "clientes", "documento", "12345678909"]}}
+          "request": {"method": "GET", "url": {"raw": "http://localhost:8089/api/v1/clientes/documento?documento=12345678909", "host": ["http://localhost:8089"], "path": ["api", "v1", "clientes", "documento"], "query": [{"key": "documento", "value": "12345678909"}]}}
         },
+        {
+          "name": "Atualizar cliente",
+          "request": {
+            "method": "PUT",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "body": {"mode": "raw", "raw": "{\n  \"nome\": \"Joao da Silva\",\n  \"documento\": \"12345678909\",\n  \"email\": \"joao@example.com\",\n  \"telefone\": \"11999999999\"\n}", "options": {"raw": {"language": "json"}}},
+            "url": {"raw": "http://localhost:8089/api/v1/clientes/1", "host": ["http://localhost:8089"], "path": ["api", "v1", "clientes", "1"]}
+          }
+        },
+        {
+          "name": "Excluir cliente",
+          "request": {"method": "DELETE", "url": {"raw": "http://localhost:8089/api/v1/clientes/1", "host": ["http://localhost:8089"], "path": ["api", "v1", "clientes", "1"]}}
+        }
+      ]
+    },
+    {
+      "name": "Veiculo",
+      "item": [
         {
           "name": "Cadastrar veiculo",
           "request": {
@@ -107,6 +125,24 @@
           "request": {"method": "GET", "url": {"raw": "http://localhost:8089/api/v1/veiculos/placa/ABC1D23", "host": ["http://localhost:8089"], "path": ["api", "v1", "veiculos", "placa", "ABC1D23"]}}
         },
         {
+          "name": "Atualizar veiculo",
+          "request": {
+            "method": "PUT",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "body": {"mode": "raw", "raw": "{\n  \"marca\": \"Toyota\",\n  \"modelo\": \"Corolla\",\n  \"ano\": 2022,\n  \"placa\": \"ABC1D23\",\n  \"clienteId\": 1\n}", "options": {"raw": {"language": "json"}}},
+            "url": {"raw": "http://localhost:8089/api/v1/veiculos/1", "host": ["http://localhost:8089"], "path": ["api", "v1", "veiculos", "1"]}
+          }
+        },
+        {
+          "name": "Excluir veiculo",
+          "request": {"method": "DELETE", "url": {"raw": "http://localhost:8089/api/v1/veiculos/1", "host": ["http://localhost:8089"], "path": ["api", "v1", "veiculos", "1"]}}
+        }
+      ]
+    },
+    {
+      "name": "Servico",
+      "item": [
+        {
           "name": "Cadastrar servico",
           "request": {
             "method": "POST",
@@ -124,6 +160,24 @@
           "request": {"method": "GET", "url": {"raw": "http://localhost:8089/api/v1/servicos/1", "host": ["http://localhost:8089"], "path": ["api", "v1", "servicos", "1"]}}
         },
         {
+          "name": "Atualizar servico",
+          "request": {
+            "method": "PUT",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "body": {"mode": "raw", "raw": "{\n  \"nome\": \"Troca de oleo\",\n  \"descricao\": \"Troca de oleo do motor\",\n  \"preco\": 150.00,\n  \"tipo\": \"MANUTENCAO\",\n  \"tempoEstimadoMinutos\": 60\n}", "options": {"raw": {"language": "json"}}},
+            "url": {"raw": "http://localhost:8089/api/v1/servicos/1", "host": ["http://localhost:8089"], "path": ["api", "v1", "servicos", "1"]}
+          }
+        },
+        {
+          "name": "Excluir servico",
+          "request": {"method": "DELETE", "url": {"raw": "http://localhost:8089/api/v1/servicos/1", "host": ["http://localhost:8089"], "path": ["api", "v1", "servicos", "1"]}}
+        }
+      ]
+    },
+    {
+      "name": "Peca",
+      "item": [
+        {
           "name": "Cadastrar peca",
           "request": {
             "method": "POST",
@@ -140,22 +194,40 @@
           "name": "Buscar peca por ID",
           "request": {"method": "GET", "url": {"raw": "http://localhost:8089/api/v1/pecas/1", "host": ["http://localhost:8089"], "path": ["api", "v1", "pecas", "1"]}}
         },
-          {
-            "name": "Buscar peca por codigo",
-            "request": {"method": "GET", "url": {"raw": "http://localhost:8089/api/v1/pecas/codigo/FIL001", "host": ["http://localhost:8089"], "path": ["api", "v1", "pecas", "codigo", "FIL001"]}}
+        {
+          "name": "Buscar peca por codigo",
+          "request": {"method": "GET", "url": {"raw": "http://localhost:8089/api/v1/pecas/codigo/FIL001", "host": ["http://localhost:8089"], "path": ["api", "v1", "pecas", "codigo", "FIL001"]}}
+        },
+        {
+          "name": "Atualizar peca",
+          "request": {
+            "method": "PUT",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "body": {"mode": "raw", "raw": "{\n  \"nome\": \"Filtro de oleo\",\n  \"descricao\": \"Filtro para motor\",\n  \"codigo\": \"FIL001\",\n  \"preco\": 45.90,\n  \"estoqueMinimo\": 10\n}", "options": {"raw": {"language": "json"}}},
+            "url": {"raw": "http://localhost:8089/api/v1/pecas/1", "host": ["http://localhost:8089"], "path": ["api", "v1", "pecas", "1"]}
+          }
+        },
+        {
+          "name": "Excluir peca",
+          "request": {"method": "DELETE", "url": {"raw": "http://localhost:8089/api/v1/pecas/1", "host": ["http://localhost:8089"], "path": ["api", "v1", "pecas", "1"]}}
         },
         {
           "name": "Repor estoque",
-          "request": {"method": "PUT", "url": {"raw": "http://localhost:8089/api/v1/pecas/1/repor-estoque/10", "host": ["http://localhost:8089"], "path": ["api", "v1", "pecas", "1", "repor-estoque", "10"]}}
+          "request": {
+            "method": "PUT",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "body": {"mode": "raw", "raw": "{\n  \"quantidade\": 10\n}", "options": {"raw": {"language": "json"}}},
+            "url": {"raw": "http://localhost:8089/api/v1/pecas/1/repor-estoque", "host": ["http://localhost:8089"], "path": ["api", "v1", "pecas", "1", "repor-estoque"]}
+          }
         },
-          {
-            "name": "Listar estoque baixo",
-            "request": {"method": "GET", "url": {"raw": "http://localhost:8089/api/v1/pecas/estoque-baixo", "host": ["http://localhost:8089"], "path": ["api", "v1", "pecas", "estoque-baixo"]}}
+        {
+          "name": "Listar estoque baixo",
+          "request": {"method": "GET", "url": {"raw": "http://localhost:8089/api/v1/pecas/estoque-baixo", "host": ["http://localhost:8089"], "path": ["api", "v1", "pecas", "estoque-baixo"]}}
         }
       ]
     },
     {
-      "name": "Ordens de servico",
+      "name": "Ordem de Servico",
       "item": [
         {
           "name": "Criar OS",

@@ -9,4 +9,6 @@ public interface ServicoRepositoryPort {
     Servico salvar(Servico servico);
     List<Servico> buscarTodos();
     Optional<Servico> buscarPorId(Long id);
+    Optional<Servico> buscarPorNome(String nome);
+    void excluirPorId(Long id);
 }

@@ -14,6 +14,9 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import br.com.fiap.adapters.in.web.DTO.Dados.Response;
+import br.com.fiap.adapters.in.web.DTO.Veiculo.VeiculoCreateRequest;
+import br.com.fiap.adapters.in.web.DTO.Veiculo.VeiculoResponse;
+import br.com.fiap.adapters.in.web.DTO.Veiculo.VeiculoUpdateRequest;
 import br.com.fiap.adapters.in.web.mapper.VeiculoMapper;
 import br.com.fiap.domain.entities.Veiculo;
 import br.com.fiap.ports.in.VeiculoUseCase;
@@ -95,14 +98,14 @@ public class VeiculoController {
         )
     })
     @PostMapping
-    public ResponseEntity<Response<VeiculoResponseDTO>> cadastrar(
+    public ResponseEntity<Response<VeiculoResponse>> cadastrar(
             @io.swagger.v3.oas.annotations.parameters.RequestBody(
                 description = "Dados do veículo a ser cadastrado",
                 required = true
             )
-            @Valid @RequestBody VeiculoRequestDTO requestDTO) {
+            @Valid @RequestBody VeiculoCreateRequest requestDTO) {
 
-        Veiculo veiculoDomain = VeiculoMapper.toDomain(null, requestDTO);
+        Veiculo veiculoDomain = VeiculoMapper.toDomain(requestDTO);
 
         Veiculo veiculoSalvo = veiculoUseCase.cadastrarVeiculo(veiculoDomain);
 
@@ -118,7 +121,7 @@ public class VeiculoController {
         @ApiResponse(responseCode = "200", description = "Lista de veículos retornada com sucesso")
     })
     @GetMapping
-    public ResponseEntity<Response<List<VeiculoResponseDTO>>> listarTodos() {
+    public ResponseEntity<Response<List<VeiculoResponse>>> listarTodos() {
         List<Veiculo> veiculos = veiculoUseCase.listarTodos();
 
         return ResponseEntity.ok(new Response<>("success", "Veículos listados com sucesso", VeiculoMapper.toResponseList(veiculos)));
@@ -132,7 +135,7 @@ public class VeiculoController {
         @ApiResponse(responseCode = "200", description = "Lista de veículos do cliente retornada com sucesso")
     })
     @GetMapping("/cliente/{clienteId}")
-    public ResponseEntity<Response<List<VeiculoResponseDTO>>> listarPorCliente(
+    public ResponseEntity<Response<List<VeiculoResponse>>> listarPorCliente(
             @Parameter(
                 description = "ID do cliente",
                 example = "1",
@@ -159,7 +162,7 @@ public class VeiculoController {
             examples = @ExampleObject(value = "{\"status\": \"error\", \"message\": \"Veículo não encontrado com a placa: ABC1D23\", \"dados\": null}")))
     })
     @GetMapping("/placa/{placa}")
-    public ResponseEntity<Response<VeiculoResponseDTO>> buscarPorPlaca(
+    public ResponseEntity<Response<VeiculoResponse>> buscarPorPlaca(
             @Parameter(
                 description = "Placa do veículo (ABC1234 ou ABC1D23)",
                 example = "ABC1D23",
@@ -183,10 +186,10 @@ public class VeiculoController {
             examples = @ExampleObject(value = "{\"status\": \"error\", \"message\": \"Veículo com placa informada já existe.\", \"dados\": null}")))
     })
     @PutMapping("/{id}")
-    public ResponseEntity<Response<VeiculoResponseDTO>> atualizar(
+    public ResponseEntity<Response<VeiculoResponse>> atualizar(
             @Parameter(description = "ID do veículo", example = "1")
             @PathVariable Long id,
-            @Valid @RequestBody VeiculoRequestDTO requestDTO) {
+            @Valid @RequestBody VeiculoUpdateRequest requestDTO) {
 
         Veiculo veiculoDomain = VeiculoMapper.toDomain(id, requestDTO);
 
