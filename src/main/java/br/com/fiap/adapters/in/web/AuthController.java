@@ -6,11 +6,11 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import br.com.fiap.adapters.in.web.DTO.Dados.Response;
 import br.com.fiap.ports.in.AuthUseCase;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.ExampleObject;
-import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -34,13 +34,13 @@ public class AuthController {
         summary = "Realizar login",
         description = """
             Autentica um administrador do sistema e retorna um token JWT.
-            
+
             **Uso:**
             1. Envie as credenciais (usuário e senha)
             2. Use o token retornado no header `Authorization: Bearer {token}`
-            
-            **Validade do token:** 8 horas
-            
+
+            **Validade do token:** 2 horas
+
             **Credenciais padrão (seed):**
             - Usuário: `admin`
             - Senha: `admin123`
@@ -50,36 +50,33 @@ public class AuthController {
         @ApiResponse(
             responseCode = "200",
             description = "Autenticação realizada com sucesso",
-            content = @Content(
-                mediaType = "application/json",
-                schema = @Schema(implementation = TokenResponseDTO.class),
-                examples = @ExampleObject(
-                    value = """
-                        {
+            content = @Content(examples = @ExampleObject(
+                value = """
+                    {
+                        "status": "success",
+                        "message": "Autenticação realizada com sucesso",
+                        "dados": {
                             "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJhZG1pbiIsImlhdCI6MTY5MTg5NjAwMCwiZXhwIjoxNjkxOTgyNDAwfQ..."
                         }
-                        """
-                )
-            )
+                    }
+                    """
+            ))
         ),
-        @ApiResponse(
-            responseCode = "403",
-            description = "Credenciais inválidas (corpo vazio)"
-        )
+        @ApiResponse(responseCode = "400", description = "Dados inválidos", content = @Content(
+            examples = @ExampleObject(value = "{\"status\": \"error\", \"message\": \"usuario: O usuário é obrigatório\", \"dados\": null}"))),
+        @ApiResponse(responseCode = "401", description = "Credenciais inválidas", content = @Content(
+            examples = @ExampleObject(value = "{\"status\": \"error\", \"message\": \"Credenciais inválidas\", \"dados\": null}")))
     })
     @PostMapping("/login")
-    public ResponseEntity<TokenResponseDTO> login(
+    public ResponseEntity<Response<TokenResponseDTO>> login(
             @io.swagger.v3.oas.annotations.parameters.RequestBody(
                 description = "Credenciais de acesso",
                 required = true
             )
             @Valid @RequestBody LoginRequestDTO request) {
-        
-        try {
-            String token = authUseCase.autenticar(request.getUsuario(), request.getSenha());
-            return ResponseEntity.ok(new TokenResponseDTO(token));
-        } catch (RuntimeException ex) {
-            return ResponseEntity.status(403).build();
-        }
+
+        String token = authUseCase.autenticar(request.getUsuario(), request.getSenha());
+
+        return ResponseEntity.ok(new Response<>("success", "Autenticação realizada com sucesso", new TokenResponseDTO(token)));
     }
 }

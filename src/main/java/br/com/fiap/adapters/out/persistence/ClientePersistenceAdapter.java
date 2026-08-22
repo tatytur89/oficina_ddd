@@ -3,6 +3,8 @@ package br.com.fiap.adapters.out.persistence;
 import java.util.List;
 import java.util.Optional;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Repository;
 
 import br.com.fiap.domain.entities.Cliente;
@@ -10,6 +12,8 @@ import br.com.fiap.ports.out.ClienteRepositoryPort;
 
 @Repository
 public class ClientePersistenceAdapter implements ClienteRepositoryPort {
+
+    private static final Logger log = LoggerFactory.getLogger(ClientePersistenceAdapter.class);
 
     private final ClienteJpaRepository jpaRepository;
     public ClientePersistenceAdapter(ClienteJpaRepository jpaRepository) {
@@ -41,8 +45,18 @@ public class ClientePersistenceAdapter implements ClienteRepositoryPort {
     @Override
     public List<Cliente> buscarTodos() {
         return jpaRepository.findAll().stream()
-                .map(this::mapearParaDominio)
+                .map(this::mapearParaDominioSeguro)
+                .flatMap(Optional::stream)
                 .toList();
+    }
+
+    private Optional<Cliente> mapearParaDominioSeguro(ClienteJpaEntity entity) {
+        try {
+            return Optional.of(mapearParaDominio(entity));
+        } catch (IllegalArgumentException ex) {
+            log.warn("Cliente com ID {} possui dados inválidos e foi ignorado na listagem: {}", entity.getId(), ex.getMessage());
+            return Optional.empty();
+        }
     }
     
     @Override

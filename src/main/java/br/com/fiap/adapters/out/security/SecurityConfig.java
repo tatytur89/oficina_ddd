@@ -42,7 +42,7 @@ private final SecurityFilter securityFilter;
                     req.requestMatchers(HttpMethod.POST, "/api/v1/auth/login").permitAll();
                     
                     // Libera endpoint público de acompanhamento de OS
-                    req.requestMatchers(HttpMethod.GET, "/api/v1/os/*/acompanhar").permitAll();
+                    req.requestMatchers(HttpMethod.GET, "/api/v1/ordens-servico/*/acompanhar").permitAll();
                     
                     // Exige autenticação (token JWT) para todas as outras rotas
                     req.anyRequest().authenticated();

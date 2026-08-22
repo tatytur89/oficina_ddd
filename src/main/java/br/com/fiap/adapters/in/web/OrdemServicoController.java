@@ -33,7 +33,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 
 @RestController
-@RequestMapping("/api/v1/os")
+@RequestMapping("/api/v1/ordens-servico")
 @Tag(
     name = "Ordens de Serviço",
     description = "Endpoints para gestão completa do fluxo de ordens de serviço"

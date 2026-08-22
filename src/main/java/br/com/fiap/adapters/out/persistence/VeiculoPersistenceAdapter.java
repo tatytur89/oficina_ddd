@@ -3,6 +3,8 @@ package br.com.fiap.adapters.out.persistence;
 import java.util.List;
 import java.util.Optional;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Repository;
 
 import br.com.fiap.domain.entities.Veiculo;
@@ -10,6 +12,8 @@ import br.com.fiap.ports.out.VeiculoRepositoryPort;
 
 @Repository
 public class VeiculoPersistenceAdapter implements VeiculoRepositoryPort {
+
+    private static final Logger log = LoggerFactory.getLogger(VeiculoPersistenceAdapter.class);
 
     private final VeiculoJpaRepository jpaRepository;
 
@@ -43,15 +47,26 @@ public class VeiculoPersistenceAdapter implements VeiculoRepositoryPort {
     @Override
     public List<Veiculo> buscarTodos() {
         return jpaRepository.findAll().stream()
-                .map(this::mapearParaDominio)
+                .map(this::mapearParaDominioSeguro)
+                .flatMap(Optional::stream)
                 .toList();
     }
 
     @Override
     public List<Veiculo> buscarPorClienteId(Long clienteId) {
         return jpaRepository.findByClienteId(clienteId).stream()
-                .map(this::mapearParaDominio)
+                .map(this::mapearParaDominioSeguro)
+                .flatMap(Optional::stream)
                 .toList();
+    }
+
+    private Optional<Veiculo> mapearParaDominioSeguro(VeiculoJpaEntity entity) {
+        try {
+            return Optional.of(mapearParaDominio(entity));
+        } catch (IllegalArgumentException ex) {
+            log.warn("Veículo com ID {} possui dados inválidos e foi ignorado na listagem: {}", entity.getId(), ex.getMessage());
+            return Optional.empty();
+        }
     }
 
     @Override

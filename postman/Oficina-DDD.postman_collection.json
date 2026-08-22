@@ -235,44 +235,44 @@
             "method": "POST",
             "header": [{"key": "Content-Type", "value": "application/json"}],
             "body": {"mode": "raw", "raw": "{\n  \"clienteId\": 1,\n  \"veiculoId\": 1,\n  \"dataPrevistaEntrega\": \"2026-08-30T18:00:00\",\n  \"observacoes\": \"Ruido no freio dianteiro\",\n  \"servicos\": [{\n    \"servicoId\": 1,\n    \"quantidade\": 1\n  }],\n  \"pecas\": [{\n    \"pecaId\": 1,\n    \"quantidade\": 1\n  }]\n}", "options": {"raw": {"language": "json"}}},
-            "url": {"raw": "http://localhost:8089/api/v1/os", "host": ["http://localhost:8089"], "path": ["api", "v1", "os"]}
+            "url": {"raw": "http://localhost:8089/api/v1/ordens-servico", "host": ["http://localhost:8089"], "path": ["api", "v1", "ordens-servico"]}
           }
         },
         {
           "name": "Listar OS",
-          "request": {"method": "GET", "url": {"raw": "http://localhost:8089/api/v1/os", "host": ["http://localhost:8089"], "path": ["api", "v1", "os"]}}
+          "request": {"method": "GET", "url": {"raw": "http://localhost:8089/api/v1/ordens-servico", "host": ["http://localhost:8089"], "path": ["api", "v1", "ordens-servico"]}}
         },
         {
           "name": "Buscar OS por ID",
-          "request": {"method": "GET", "url": {"raw": "http://localhost:8089/api/v1/os/1", "host": ["http://localhost:8089"], "path": ["api", "v1", "os", "1"]}}
+          "request": {"method": "GET", "url": {"raw": "http://localhost:8089/api/v1/ordens-servico/1", "host": ["http://localhost:8089"], "path": ["api", "v1", "ordens-servico", "1"]}}
         },
         {
           "name": "Listar OS por cliente",
-          "request": {"method": "GET", "url": {"raw": "http://localhost:8089/api/v1/os/cliente/1", "host": ["http://localhost:8089"], "path": ["api", "v1", "os", "cliente", "1"]}}
+          "request": {"method": "GET", "url": {"raw": "http://localhost:8089/api/v1/ordens-servico/cliente/1", "host": ["http://localhost:8089"], "path": ["api", "v1", "ordens-servico", "cliente", "1"]}}
         },
         {
           "name": "Listar OS por status",
-          "request": {"method": "GET", "url": {"raw": "http://localhost:8089/api/v1/os/status/RECEBIDA", "host": ["http://localhost:8089"], "path": ["api", "v1", "os", "status", "RECEBIDA"]}}
+          "request": {"method": "GET", "url": {"raw": "http://localhost:8089/api/v1/ordens-servico/status/RECEBIDA", "host": ["http://localhost:8089"], "path": ["api", "v1", "ordens-servico", "status", "RECEBIDA"]}}
         },
         {
           "name": "Listar OS por periodo",
-          "request": {"method": "GET", "url": {"raw": "http://localhost:8089/api/v1/os/periodo?inicio=2026-08-01T00:00:00&fim=2026-08-31T23:59:59", "host": ["http://localhost:8089"], "path": ["api", "v1", "os", "periodo"], "query": [{"key": "inicio", "value": "2026-08-01T00:00:00"}, {"key": "fim", "value": "2026-08-31T23:59:59"}]}}
+          "request": {"method": "GET", "url": {"raw": "http://localhost:8089/api/v1/ordens-servico/periodo?inicio=2026-08-01T00:00:00&fim=2026-08-31T23:59:59", "host": ["http://localhost:8089"], "path": ["api", "v1", "ordens-servico", "periodo"], "query": [{"key": "inicio", "value": "2026-08-01T00:00:00"}, {"key": "fim", "value": "2026-08-31T23:59:59"}]}}
         },
         {
           "name": "Enviar orcamento",
-          "request": {"method": "PATCH", "url": {"raw": "http://localhost:8089/api/v1/os/1/orcamento", "host": ["http://localhost:8089"], "path": ["api", "v1", "os", "1", "orcamento"]}}
+          "request": {"method": "PATCH", "url": {"raw": "http://localhost:8089/api/v1/ordens-servico/1/orcamento", "host": ["http://localhost:8089"], "path": ["api", "v1", "ordens-servico", "1", "orcamento"]}}
         },
         {
           "name": "Atualizar status da OS",
-          "request": {"method": "PATCH", "url": {"raw": "http://localhost:8089/api/v1/os/1/status/EM_DIAGNOSTICO", "host": ["http://localhost:8089"], "path": ["api", "v1", "os", "1", "status", "EM_DIAGNOSTICO"]}}
+          "request": {"method": "PATCH", "url": {"raw": "http://localhost:8089/api/v1/ordens-servico/1/status/EM_DIAGNOSTICO", "host": ["http://localhost:8089"], "path": ["api", "v1", "ordens-servico", "1", "status", "EM_DIAGNOSTICO"]}}
         },
         {
           "name": "Acompanhar OS (publico)",
-          "request": {"method": "GET", "auth": {"type": "noauth"}, "url": {"raw": "http://localhost:8089/api/v1/os/1/acompanhar", "host": ["http://localhost:8089"], "path": ["api", "v1", "os", "1", "acompanhar"]}}
+          "request": {"method": "GET", "auth": {"type": "noauth"}, "url": {"raw": "http://localhost:8089/api/v1/ordens-servico/1/acompanhar", "host": ["http://localhost:8089"], "path": ["api", "v1", "ordens-servico", "1", "acompanhar"]}}
         },
         {
           "name": "Tempo medio de execucao",
-          "request": {"method": "GET", "url": {"raw": "http://localhost:8089/api/v1/os/metricas/tempo-medio-execucao", "host": ["http://localhost:8089"], "path": ["api", "v1", "os", "metricas", "tempo-medio-execucao"]}}
+          "request": {"method": "GET", "url": {"raw": "http://localhost:8089/api/v1/ordens-servico/metricas/tempo-medio-execucao", "host": ["http://localhost:8089"], "path": ["api", "v1", "ordens-servico", "metricas", "tempo-medio-execucao"]}}
         }
       ]
     }

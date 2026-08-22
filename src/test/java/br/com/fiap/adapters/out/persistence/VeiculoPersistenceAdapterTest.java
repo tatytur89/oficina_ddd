@@ -20,6 +20,9 @@ class VeiculoPersistenceAdapterTest {
     @Autowired
     private VeiculoPersistenceAdapter veiculoPersistenceAdapter;
 
+    @Autowired
+    private VeiculoJpaRepository veiculoJpaRepository;
+
     @Test
     @DisplayName("Deve salvar um veículo e retorná-lo com ID gerado")
     void deveSalvarVeiculo() {
@@ -93,5 +96,29 @@ class VeiculoPersistenceAdapterTest {
         veiculoPersistenceAdapter.excluirPorId(salvo.getId());
 
         assertTrue(veiculoPersistenceAdapter.buscarPorId(salvo.getId()).isEmpty());
+    }
+
+    @Test
+    @DisplayName("Deve ignorar registros com placa inválida ao listar todos, sem quebrar a listagem")
+    void deveIgnorarVeiculoComPlacaInvalidaNaListagem() {
+        veiculoPersistenceAdapter.salvar(new Veiculo(null, "Toyota", "Corolla", 2022, "ABC1D23", 1L));
+        veiculoJpaRepository.save(new VeiculoJpaEntity(null, "Fiat", "Uno", 2000, "INVALIDA", 1L));
+
+        List<Veiculo> veiculos = veiculoPersistenceAdapter.buscarTodos();
+
+        assertEquals(1, veiculos.size());
+        assertEquals("Corolla", veiculos.get(0).getModelo());
+    }
+
+    @Test
+    @DisplayName("Deve ignorar registros com placa inválida ao listar por cliente, sem quebrar a listagem")
+    void deveIgnorarVeiculoComPlacaInvalidaAoListarPorCliente() {
+        veiculoPersistenceAdapter.salvar(new Veiculo(null, "Toyota", "Corolla", 2022, "ABC1D23", 1L));
+        veiculoJpaRepository.save(new VeiculoJpaEntity(null, "Fiat", "Uno", 2000, "INVALIDA", 1L));
+
+        List<Veiculo> veiculos = veiculoPersistenceAdapter.buscarPorClienteId(1L);
+
+        assertEquals(1, veiculos.size());
+        assertEquals("Corolla", veiculos.get(0).getModelo());
     }
 }

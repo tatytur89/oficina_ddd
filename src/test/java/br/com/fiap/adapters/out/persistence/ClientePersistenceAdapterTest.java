@@ -20,6 +20,9 @@ class ClientePersistenceAdapterTest {
     @Autowired
     private ClientePersistenceAdapter clientePersistenceAdapter;
 
+    @Autowired
+    private ClienteJpaRepository clienteJpaRepository;
+
     @Test
     @DisplayName("Deve salvar um cliente e retorná-lo com ID gerado")
     void deveSalvarCliente() {
@@ -81,5 +84,17 @@ class ClientePersistenceAdapterTest {
         clientePersistenceAdapter.excluirPorId(salvo.getId());
 
         assertTrue(clientePersistenceAdapter.buscarPorId(salvo.getId()).isEmpty());
+    }
+
+    @Test
+    @DisplayName("Deve ignorar registros com documento inválido ao listar todos, sem quebrar a listagem")
+    void deveIgnorarClienteComDocumentoInvalidoNaListagem() {
+        clientePersistenceAdapter.salvar(new Cliente(null, "Robert", "12345678909", "robert@email.com", "11999999999"));
+        clienteJpaRepository.save(new ClienteJpaEntity(null, "Corrompido", "123", null, null));
+
+        List<Cliente> clientes = clientePersistenceAdapter.buscarTodos();
+
+        assertEquals(1, clientes.size());
+        assertEquals("Robert", clientes.get(0).getNome());
     }
 }

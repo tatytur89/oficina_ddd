@@ -224,8 +224,14 @@ class OrdemServicoServiceTest {
     @DisplayName("Deve baixar o estoque das peças ao transicionar a OS para EM_EXECUCAO")
     void deveBaixarEstoqueAoIniciarExecucao() {
         Peca peca = new Peca(1L, "Filtro de Óleo", "Descrição", "FIL001", new Preco(BigDecimal.valueOf(45.90)), 50, 10);
-        OrdemServico os = new OrdemServico(1L, 1L, 1L, StatusOS.AGUARDANDO_APROVACAO, null, null, null, "obs", new Preco(BigDecimal.ZERO), new Preco(BigDecimal.ZERO), new Preco(BigDecimal.ZERO), null, null);
-        os.adicionarPeca(peca, 2);
+
+        // Monta a OS ainda em RECEBIDA (único jeito de adicionar peças), depois "avança" pra AGUARDANDO_APROVACAO
+        OrdemServico osComPeca = new OrdemServico(1L, 1L, 1L, StatusOS.RECEBIDA, null, null, null, "obs", new Preco(BigDecimal.ZERO), new Preco(BigDecimal.ZERO), new Preco(BigDecimal.ZERO), null, null);
+        osComPeca.adicionarPeca(peca, 2);
+
+        OrdemServico os = new OrdemServico(1L, 1L, 1L, StatusOS.AGUARDANDO_APROVACAO, null, null, null, "obs",
+                osComPeca.getValorServicos(), osComPeca.getValorPecas(), osComPeca.getValorTotal(),
+                osComPeca.getServicos(), osComPeca.getPecas());
 
         when(osRepositoryPort.buscarPorId(1L)).thenReturn(Optional.of(os));
         when(osRepositoryPort.salvar(any(OrdemServico.class))).thenAnswer(invocation -> invocation.getArgument(0));
