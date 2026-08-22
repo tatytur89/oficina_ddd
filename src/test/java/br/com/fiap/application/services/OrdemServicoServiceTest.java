@@ -16,7 +16,7 @@ import br.com.fiap.domain.entities.Veiculo;
 import br.com.fiap.domain.valueobjects.Preco;
 import br.com.fiap.domain.valueobjects.StatusOS;
 import br.com.fiap.domain.valueobjects.TipoServico;
-import br.com.fiap.ports.in.ItemQuantidade;
+import br.com.fiap.ports.in.ItemDiagnostico;
 import br.com.fiap.ports.in.PecaUseCase;
 import br.com.fiap.ports.in.ServicoUseCase;
 import br.com.fiap.ports.in.TempoMedioExecucao;
@@ -58,47 +58,34 @@ class OrdemServicoServiceTest {
     private static final Veiculo VEICULO = new Veiculo(1L, "Toyota", "Corolla", 2022, "ABC1D23", 1L);
 
     private OrdemServico novaOSMinima() {
-        return new OrdemServico(null, 1L, 1L, null, null, null, null, "Barulho no freio", null, null, null, null, null);
+        return new OrdemServico(null, 1L, 1L, null, null, null, null, "Barulho no freio", null, null, null, null, null, null, null, null);
+    }
+
+    private OrdemServico osComStatus(StatusOS status) {
+        return new OrdemServico(1L, 1L, 1L, status, null, null, null, "obs",
+                new Preco(BigDecimal.ZERO), new Preco(BigDecimal.ZERO), new Preco(BigDecimal.ZERO), null, null, null, null, null);
+    }
+
+    private OrdemServico osComStatusEChave(StatusOS status, String chave) {
+        return new OrdemServico(1L, 1L, 1L, status, null, null, null, "obs",
+                new Preco(BigDecimal.ZERO), new Preco(BigDecimal.ZERO), new Preco(BigDecimal.ZERO), null, null, chave, null, null);
     }
 
     @Test
-    @DisplayName("Deve criar uma OS com serviços e peças, calculando o orçamento corretamente")
-    void deveCriarOSComServicosEPecas() {
-        Servico servico = new Servico(1L, "Troca de Óleo", "Descrição", new Preco(BigDecimal.valueOf(150.00)), TipoServico.MANUTENCAO, 60);
-        Peca peca = new Peca(1L, "Filtro de Óleo", "Descrição", "FIL001", new Preco(BigDecimal.valueOf(45.90)), 50, 10);
-
+    @DisplayName("Deve criar uma OS vazia, gerando a chave de acesso")
+    void deveCriarOS() {
         when(clienteRepositoryPort.buscarPorId(1L)).thenReturn(Optional.of(CLIENTE));
         when(veiculoRepositoryPort.buscarPorId(1L)).thenReturn(Optional.of(VEICULO));
-        when(servicoUseCase.buscarPorId(1L)).thenReturn(servico);
-        when(pecaUseCase.buscarPorId(1L)).thenReturn(peca);
         when(osRepositoryPort.salvar(any(OrdemServico.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
-        OrdemServico resultado = ordemServicoService.criarOS(
-                novaOSMinima(),
-                List.of(new ItemQuantidade(1L, 1)),
-                List.of(new ItemQuantidade(1L, 2))
-        );
+        OrdemServico resultado = ordemServicoService.criarOS(novaOSMinima());
 
         assertEquals(StatusOS.RECEBIDA, resultado.getStatus());
-        assertEquals(1, resultado.getServicos().size());
-        assertEquals(1, resultado.getPecas().size());
-        assertEquals(0, new BigDecimal("150.00").compareTo(resultado.getValorServicos().getValor()));
-        assertEquals(0, new BigDecimal("91.80").compareTo(resultado.getValorPecas().getValor()));
-        assertEquals(0, new BigDecimal("241.80").compareTo(resultado.getValorTotal().getValor()));
-        verify(osRepositoryPort, times(1)).salvar(any(OrdemServico.class));
-    }
-
-    @Test
-    @DisplayName("Deve criar uma OS sem serviços e peças informados")
-    void deveCriarOSSemServicosEPecas() {
-        when(clienteRepositoryPort.buscarPorId(1L)).thenReturn(Optional.of(CLIENTE));
-        when(veiculoRepositoryPort.buscarPorId(1L)).thenReturn(Optional.of(VEICULO));
-        when(osRepositoryPort.salvar(any(OrdemServico.class))).thenAnswer(invocation -> invocation.getArgument(0));
-
-        OrdemServico resultado = ordemServicoService.criarOS(novaOSMinima(), null, null);
-
         assertTrue(resultado.getServicos().isEmpty());
         assertTrue(resultado.getPecas().isEmpty());
+        assertEquals(0, BigDecimal.ZERO.compareTo(resultado.getValorTotal().getValor()));
+        assertNotNull(resultado.getChaveAcesso());
+        verify(osRepositoryPort, times(1)).salvar(any(OrdemServico.class));
     }
 
     @Test
@@ -106,7 +93,7 @@ class OrdemServicoServiceTest {
     void deveLancarResourceNotFoundExceptionAoCriarOSComClienteInexistente() {
         when(clienteRepositoryPort.buscarPorId(1L)).thenReturn(Optional.empty());
 
-        assertThrows(ResourceNotFoundException.class, () -> ordemServicoService.criarOS(novaOSMinima(), null, null));
+        assertThrows(ResourceNotFoundException.class, () -> ordemServicoService.criarOS(novaOSMinima()));
         verify(osRepositoryPort, never()).salvar(any(OrdemServico.class));
     }
 
@@ -116,38 +103,153 @@ class OrdemServicoServiceTest {
         when(clienteRepositoryPort.buscarPorId(1L)).thenReturn(Optional.of(CLIENTE));
         when(veiculoRepositoryPort.buscarPorId(1L)).thenReturn(Optional.empty());
 
-        assertThrows(ResourceNotFoundException.class, () -> ordemServicoService.criarOS(novaOSMinima(), null, null));
+        assertThrows(ResourceNotFoundException.class, () -> ordemServicoService.criarOS(novaOSMinima()));
         verify(osRepositoryPort, never()).salvar(any(OrdemServico.class));
     }
 
     @Test
-    @DisplayName("Deve lançar ResourceNotFoundException ao criar OS com serviço inexistente")
-    void deveLancarResourceNotFoundExceptionAoCriarOSComServicoInexistente() {
-        when(clienteRepositoryPort.buscarPorId(1L)).thenReturn(Optional.of(CLIENTE));
-        when(veiculoRepositoryPort.buscarPorId(1L)).thenReturn(Optional.of(VEICULO));
+    @DisplayName("Deve realizar o diagnóstico transicionando a OS e registrando serviços e peças")
+    void deveRealizarDiagnostico() {
+        Servico servico = new Servico(1L, "Troca de Óleo", "Descrição", new Preco(BigDecimal.valueOf(150.00)), TipoServico.MANUTENCAO, 60);
+        Peca peca = new Peca(1L, "Filtro de Óleo", "Descrição", "FIL001", new Preco(BigDecimal.valueOf(45.90)), 50, 10);
+        OrdemServico os = osComStatus(StatusOS.RECEBIDA);
+
+        when(osRepositoryPort.buscarPorId(1L)).thenReturn(Optional.of(os));
+        when(servicoUseCase.buscarPorId(1L)).thenReturn(servico);
+        when(pecaUseCase.buscarPorId(1L)).thenReturn(peca);
+        when(osRepositoryPort.salvar(any(OrdemServico.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        LocalDateTime dataPrevista = LocalDateTime.of(2026, 9, 1, 18, 0);
+
+        OrdemServico resultado = ordemServicoService.realizarDiagnostico(
+                1L,
+                List.of(new ItemDiagnostico(1L, 1)),
+                List.of(new ItemDiagnostico(1L, 2)),
+                dataPrevista
+        );
+
+        assertEquals(StatusOS.EM_DIAGNOSTICO, resultado.getStatus());
+        assertEquals(1, resultado.getServicos().size());
+        assertEquals(1, resultado.getPecas().size());
+        assertEquals(0, new BigDecimal("241.80").compareTo(resultado.getValorTotal().getValor()));
+        assertEquals(dataPrevista, resultado.getDataPrevistaEntrega());
+    }
+
+    @Test
+    @DisplayName("Deve realizar o diagnóstico sem serviços e peças informados")
+    void deveRealizarDiagnosticoSemItens() {
+        OrdemServico os = osComStatus(StatusOS.RECEBIDA);
+        when(osRepositoryPort.buscarPorId(1L)).thenReturn(Optional.of(os));
+        when(osRepositoryPort.salvar(any(OrdemServico.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        OrdemServico resultado = ordemServicoService.realizarDiagnostico(1L, null, null, null);
+
+        assertEquals(StatusOS.EM_DIAGNOSTICO, resultado.getStatus());
+        assertTrue(resultado.getServicos().isEmpty());
+        assertTrue(resultado.getPecas().isEmpty());
+    }
+
+    @Test
+    @DisplayName("Deve lançar ResourceNotFoundException ao diagnosticar OS inexistente")
+    void deveLancarResourceNotFoundExceptionAoDiagnosticarOSInexistente() {
+        when(osRepositoryPort.buscarPorId(1L)).thenReturn(Optional.empty());
+
+        assertThrows(ResourceNotFoundException.class, () -> ordemServicoService.realizarDiagnostico(1L, null, null, null));
+    }
+
+    @Test
+    @DisplayName("Deve lançar IllegalStateException ao diagnosticar OS fora de RECEBIDA")
+    void deveLancarIllegalStateExceptionAoDiagnosticarForaDeRecebida() {
+        OrdemServico os = osComStatus(StatusOS.EM_DIAGNOSTICO);
+        when(osRepositoryPort.buscarPorId(1L)).thenReturn(Optional.of(os));
+
+        assertThrows(IllegalStateException.class, () -> ordemServicoService.realizarDiagnostico(1L, null, null, null));
+        verify(osRepositoryPort, never()).salvar(any(OrdemServico.class));
+    }
+
+    @Test
+    @DisplayName("Deve lançar ResourceNotFoundException ao diagnosticar com serviço inexistente")
+    void deveLancarResourceNotFoundExceptionAoDiagnosticarComServicoInexistente() {
+        OrdemServico os = osComStatus(StatusOS.RECEBIDA);
+        when(osRepositoryPort.buscarPorId(1L)).thenReturn(Optional.of(os));
         when(servicoUseCase.buscarPorId(99L)).thenThrow(new ResourceNotFoundException("Serviço não encontrado com ID: 99"));
 
         assertThrows(ResourceNotFoundException.class,
-                () -> ordemServicoService.criarOS(novaOSMinima(), List.of(new ItemQuantidade(99L, 1)), null));
+                () -> ordemServicoService.realizarDiagnostico(1L, List.of(new ItemDiagnostico(99L, 1)), null, null));
+    }
+
+    @Test
+    @DisplayName("Deve adicionar serviço a uma OS em diagnóstico")
+    void deveAdicionarServico() {
+        Servico servico = new Servico(1L, "Troca de Óleo", "Descrição", new Preco(BigDecimal.valueOf(150.00)), TipoServico.MANUTENCAO, 60);
+        OrdemServico os = osComStatus(StatusOS.EM_DIAGNOSTICO);
+
+        when(osRepositoryPort.buscarPorId(1L)).thenReturn(Optional.of(os));
+        when(servicoUseCase.buscarPorId(1L)).thenReturn(servico);
+        when(osRepositoryPort.salvar(any(OrdemServico.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        OrdemServico resultado = ordemServicoService.adicionarServico(1L, 1L, 1);
+
+        assertEquals(1, resultado.getServicos().size());
+        assertEquals(0, new BigDecimal("150.00").compareTo(resultado.getValorTotal().getValor()));
+    }
+
+    @Test
+    @DisplayName("Deve lançar ResourceNotFoundException ao adicionar serviço a OS inexistente")
+    void deveLancarResourceNotFoundExceptionAoAdicionarServicoDeOSInexistente() {
+        when(osRepositoryPort.buscarPorId(1L)).thenReturn(Optional.empty());
+
+        assertThrows(ResourceNotFoundException.class, () -> ordemServicoService.adicionarServico(1L, 1L, 1));
+    }
+
+    @Test
+    @DisplayName("Deve lançar IllegalStateException ao adicionar serviço fora de EM_DIAGNOSTICO")
+    void deveLancarIllegalStateExceptionAoAdicionarServicoForaDeDiagnostico() {
+        OrdemServico os = osComStatus(StatusOS.RECEBIDA);
+        when(osRepositoryPort.buscarPorId(1L)).thenReturn(Optional.of(os));
+
+        assertThrows(IllegalStateException.class, () -> ordemServicoService.adicionarServico(1L, 1L, 1));
         verify(osRepositoryPort, never()).salvar(any(OrdemServico.class));
     }
 
     @Test
-    @DisplayName("Deve lançar ResourceNotFoundException ao criar OS com peça inexistente")
-    void deveLancarResourceNotFoundExceptionAoCriarOSComPecaInexistente() {
-        when(clienteRepositoryPort.buscarPorId(1L)).thenReturn(Optional.of(CLIENTE));
-        when(veiculoRepositoryPort.buscarPorId(1L)).thenReturn(Optional.of(VEICULO));
-        when(pecaUseCase.buscarPorId(99L)).thenThrow(new ResourceNotFoundException("Peça não encontrada com ID: 99"));
+    @DisplayName("Deve adicionar peça a uma OS em diagnóstico")
+    void deveAdicionarPeca() {
+        Peca peca = new Peca(1L, "Filtro de Óleo", "Descrição", "FIL001", new Preco(BigDecimal.valueOf(45.90)), 50, 10);
+        OrdemServico os = osComStatus(StatusOS.EM_DIAGNOSTICO);
 
-        assertThrows(ResourceNotFoundException.class,
-                () -> ordemServicoService.criarOS(novaOSMinima(), null, List.of(new ItemQuantidade(99L, 1))));
+        when(osRepositoryPort.buscarPorId(1L)).thenReturn(Optional.of(os));
+        when(pecaUseCase.buscarPorId(1L)).thenReturn(peca);
+        when(osRepositoryPort.salvar(any(OrdemServico.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        OrdemServico resultado = ordemServicoService.adicionarPeca(1L, 1L, 2);
+
+        assertEquals(1, resultado.getPecas().size());
+        assertEquals(0, new BigDecimal("91.80").compareTo(resultado.getValorTotal().getValor()));
+    }
+
+    @Test
+    @DisplayName("Deve lançar ResourceNotFoundException ao adicionar peça a OS inexistente")
+    void deveLancarResourceNotFoundExceptionAoAdicionarPecaDeOSInexistente() {
+        when(osRepositoryPort.buscarPorId(1L)).thenReturn(Optional.empty());
+
+        assertThrows(ResourceNotFoundException.class, () -> ordemServicoService.adicionarPeca(1L, 1L, 1));
+    }
+
+    @Test
+    @DisplayName("Deve lançar IllegalStateException ao adicionar peça fora de EM_DIAGNOSTICO")
+    void deveLancarIllegalStateExceptionAoAdicionarPecaForaDeDiagnostico() {
+        OrdemServico os = osComStatus(StatusOS.RECEBIDA);
+        when(osRepositoryPort.buscarPorId(1L)).thenReturn(Optional.of(os));
+
+        assertThrows(IllegalStateException.class, () -> ordemServicoService.adicionarPeca(1L, 1L, 1));
         verify(osRepositoryPort, never()).salvar(any(OrdemServico.class));
     }
 
     @Test
     @DisplayName("Deve listar OS por cliente")
     void deveListarPorCliente() {
-        OrdemServico os = new OrdemServico(1L, 1L, 1L, StatusOS.RECEBIDA, null, null, null, "obs", new Preco(BigDecimal.ZERO), new Preco(BigDecimal.ZERO), new Preco(BigDecimal.ZERO), null, null);
+        OrdemServico os = osComStatus(StatusOS.RECEBIDA);
         when(clienteRepositoryPort.buscarPorId(1L)).thenReturn(Optional.of(CLIENTE));
         when(osRepositoryPort.buscarPorClienteId(1L)).thenReturn(List.of(os));
 
@@ -168,7 +270,7 @@ class OrdemServicoServiceTest {
     @Test
     @DisplayName("Deve buscar OS por ID com sucesso")
     void deveBuscarPorId() {
-        OrdemServico os = new OrdemServico(1L, 1L, 1L, StatusOS.RECEBIDA, null, null, null, "obs", new Preco(BigDecimal.ZERO), new Preco(BigDecimal.ZERO), new Preco(BigDecimal.ZERO), null, null);
+        OrdemServico os = osComStatus(StatusOS.RECEBIDA);
         when(osRepositoryPort.buscarPorId(1L)).thenReturn(Optional.of(os));
 
         OrdemServico resultado = ordemServicoService.buscarPorId(1L);
@@ -193,7 +295,7 @@ class OrdemServicoServiceTest {
     @Test
     @DisplayName("Deve atualizar o status da OS com sucesso")
     void deveAtualizarStatus() {
-        OrdemServico os = new OrdemServico(1L, 1L, 1L, StatusOS.RECEBIDA, null, null, null, "obs", new Preco(BigDecimal.ZERO), new Preco(BigDecimal.ZERO), new Preco(BigDecimal.ZERO), null, null);
+        OrdemServico os = osComStatus(StatusOS.RECEBIDA);
         when(osRepositoryPort.buscarPorId(1L)).thenReturn(Optional.of(os));
         when(osRepositoryPort.salvar(any(OrdemServico.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
@@ -213,7 +315,7 @@ class OrdemServicoServiceTest {
     @Test
     @DisplayName("Deve lançar IllegalStateException ao tentar uma transição de status inválida")
     void deveLancarIllegalStateExceptionAoTransicionarStatusInvalido() {
-        OrdemServico os = new OrdemServico(1L, 1L, 1L, StatusOS.ENTREGUE, null, null, null, "obs", new Preco(BigDecimal.ZERO), new Preco(BigDecimal.ZERO), new Preco(BigDecimal.ZERO), null, null);
+        OrdemServico os = osComStatus(StatusOS.ENTREGUE);
         when(osRepositoryPort.buscarPorId(1L)).thenReturn(Optional.of(os));
 
         assertThrows(IllegalStateException.class, () -> ordemServicoService.atualizarStatus(1L, StatusOS.EM_EXECUCAO));
@@ -225,13 +327,13 @@ class OrdemServicoServiceTest {
     void deveBaixarEstoqueAoIniciarExecucao() {
         Peca peca = new Peca(1L, "Filtro de Óleo", "Descrição", "FIL001", new Preco(BigDecimal.valueOf(45.90)), 50, 10);
 
-        // Monta a OS ainda em RECEBIDA (único jeito de adicionar peças), depois "avança" pra AGUARDANDO_APROVACAO
-        OrdemServico osComPeca = new OrdemServico(1L, 1L, 1L, StatusOS.RECEBIDA, null, null, null, "obs", new Preco(BigDecimal.ZERO), new Preco(BigDecimal.ZERO), new Preco(BigDecimal.ZERO), null, null);
+        // Monta a OS em EM_DIAGNOSTICO (único jeito de adicionar peças), depois "avança" pra AGUARDANDO_APROVACAO
+        OrdemServico osComPeca = osComStatus(StatusOS.EM_DIAGNOSTICO);
         osComPeca.adicionarPeca(peca, 2);
 
         OrdemServico os = new OrdemServico(1L, 1L, 1L, StatusOS.AGUARDANDO_APROVACAO, null, null, null, "obs",
                 osComPeca.getValorServicos(), osComPeca.getValorPecas(), osComPeca.getValorTotal(),
-                osComPeca.getServicos(), osComPeca.getPecas());
+                osComPeca.getServicos(), osComPeca.getPecas(), null, null, null);
 
         when(osRepositoryPort.buscarPorId(1L)).thenReturn(Optional.of(os));
         when(osRepositoryPort.salvar(any(OrdemServico.class))).thenAnswer(invocation -> invocation.getArgument(0));
@@ -244,7 +346,7 @@ class OrdemServicoServiceTest {
     @Test
     @DisplayName("Não deve baixar estoque ao transicionar para status diferente de EM_EXECUCAO")
     void naoDeveBaixarEstoqueParaOutrosStatus() {
-        OrdemServico os = new OrdemServico(1L, 1L, 1L, StatusOS.RECEBIDA, null, null, null, "obs", new Preco(BigDecimal.ZERO), new Preco(BigDecimal.ZERO), new Preco(BigDecimal.ZERO), null, null);
+        OrdemServico os = osComStatus(StatusOS.RECEBIDA);
         when(osRepositoryPort.buscarPorId(1L)).thenReturn(Optional.of(os));
         when(osRepositoryPort.salvar(any(OrdemServico.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
@@ -257,7 +359,7 @@ class OrdemServicoServiceTest {
     @DisplayName("Deve enviar o orçamento com sucesso")
     void deveEnviarOrcamento() {
         Servico servico = new Servico(1L, "Troca de Óleo", "Descrição", new Preco(BigDecimal.valueOf(150.00)), TipoServico.MANUTENCAO, 60);
-        OrdemServico os = new OrdemServico(1L, 1L, 1L, StatusOS.EM_DIAGNOSTICO, null, null, null, "obs", new Preco(BigDecimal.ZERO), new Preco(BigDecimal.ZERO), new Preco(BigDecimal.ZERO), null, null);
+        OrdemServico os = osComStatus(StatusOS.EM_DIAGNOSTICO);
         os.adicionarServico(servico, 1);
 
         when(osRepositoryPort.buscarPorId(1L)).thenReturn(Optional.of(os));
@@ -277,6 +379,104 @@ class OrdemServicoServiceTest {
     }
 
     @Test
+    @DisplayName("Deve aprovar o orçamento com a chave correta e baixar o estoque das peças")
+    void deveAprovarOrcamentoComChaveCorreta() {
+        Peca peca = new Peca(1L, "Filtro de Óleo", "Descrição", "FIL001", new Preco(BigDecimal.valueOf(45.90)), 50, 10);
+
+        OrdemServico osComPeca = osComStatusEChave(StatusOS.EM_DIAGNOSTICO, "chave-certa");
+        osComPeca.adicionarPeca(peca, 2);
+
+        OrdemServico os = new OrdemServico(1L, 1L, 1L, StatusOS.AGUARDANDO_APROVACAO, null, null, null, "obs",
+                osComPeca.getValorServicos(), osComPeca.getValorPecas(), osComPeca.getValorTotal(),
+                osComPeca.getServicos(), osComPeca.getPecas(), "chave-certa", null, null);
+
+        when(osRepositoryPort.buscarPorId(1L)).thenReturn(Optional.of(os));
+        when(osRepositoryPort.salvar(any(OrdemServico.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        OrdemServico resultado = ordemServicoService.aprovarOrcamento(1L, "chave-certa");
+
+        assertEquals(StatusOS.EM_EXECUCAO, resultado.getStatus());
+        verify(pecaUseCase, times(1)).baixarEstoque(1L, 2);
+    }
+
+    @Test
+    @DisplayName("Deve lançar IllegalArgumentException ao aprovar orçamento com chave incorreta")
+    void deveLancarIllegalArgumentExceptionAoAprovarOrcamentoComChaveIncorreta() {
+        OrdemServico os = osComStatusEChave(StatusOS.AGUARDANDO_APROVACAO, "chave-certa");
+        when(osRepositoryPort.buscarPorId(1L)).thenReturn(Optional.of(os));
+
+        assertThrows(IllegalArgumentException.class, () -> ordemServicoService.aprovarOrcamento(1L, "chave-errada"));
+        verify(osRepositoryPort, never()).salvar(any(OrdemServico.class));
+    }
+
+    @Test
+    @DisplayName("Deve lançar ResourceNotFoundException ao aprovar orçamento de OS inexistente")
+    void deveLancarResourceNotFoundExceptionAoAprovarOrcamentoDeOSInexistente() {
+        when(osRepositoryPort.buscarPorId(1L)).thenReturn(Optional.empty());
+
+        assertThrows(ResourceNotFoundException.class, () -> ordemServicoService.aprovarOrcamento(1L, "chave-certa"));
+    }
+
+    @Test
+    @DisplayName("Deve avaliar o serviço com a chave correta quando a OS está entregue")
+    void deveAvaliarServicoComChaveCorreta() {
+        OrdemServico os = osComStatusEChave(StatusOS.ENTREGUE, "chave-certa");
+        when(osRepositoryPort.buscarPorId(1L)).thenReturn(Optional.of(os));
+        when(osRepositoryPort.salvar(any(OrdemServico.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        OrdemServico resultado = ordemServicoService.avaliarServico(1L, "chave-certa", 5, "Ótimo atendimento");
+
+        assertEquals(5, resultado.getNotaAvaliacao());
+        assertEquals("Ótimo atendimento", resultado.getComentarioAvaliacao());
+    }
+
+    @Test
+    @DisplayName("Deve lançar IllegalArgumentException ao avaliar com chave incorreta")
+    void deveLancarIllegalArgumentExceptionAoAvaliarComChaveIncorreta() {
+        OrdemServico os = osComStatusEChave(StatusOS.ENTREGUE, "chave-certa");
+        when(osRepositoryPort.buscarPorId(1L)).thenReturn(Optional.of(os));
+
+        assertThrows(IllegalArgumentException.class, () -> ordemServicoService.avaliarServico(1L, "chave-errada", 5, null));
+        verify(osRepositoryPort, never()).salvar(any(OrdemServico.class));
+    }
+
+    @Test
+    @DisplayName("Deve lançar ResourceNotFoundException ao avaliar OS inexistente")
+    void deveLancarResourceNotFoundExceptionAoAvaliarOSInexistente() {
+        when(osRepositoryPort.buscarPorId(1L)).thenReturn(Optional.empty());
+
+        assertThrows(ResourceNotFoundException.class, () -> ordemServicoService.avaliarServico(1L, "chave-certa", 5, null));
+    }
+
+    @Test
+    @DisplayName("Deve buscar OS para acompanhamento com a chave correta")
+    void deveBuscarParaAcompanhamentoComChaveCorreta() {
+        OrdemServico os = osComStatusEChave(StatusOS.EM_EXECUCAO, "chave-certa");
+        when(osRepositoryPort.buscarPorId(1L)).thenReturn(Optional.of(os));
+
+        OrdemServico resultado = ordemServicoService.buscarParaAcompanhamento(1L, "chave-certa");
+
+        assertNotNull(resultado);
+    }
+
+    @Test
+    @DisplayName("Deve lançar IllegalArgumentException ao buscar acompanhamento com chave incorreta")
+    void deveLancarIllegalArgumentExceptionAoBuscarAcompanhamentoComChaveIncorreta() {
+        OrdemServico os = osComStatusEChave(StatusOS.EM_EXECUCAO, "chave-certa");
+        when(osRepositoryPort.buscarPorId(1L)).thenReturn(Optional.of(os));
+
+        assertThrows(IllegalArgumentException.class, () -> ordemServicoService.buscarParaAcompanhamento(1L, "chave-errada"));
+    }
+
+    @Test
+    @DisplayName("Deve lançar ResourceNotFoundException ao buscar acompanhamento de OS inexistente")
+    void deveLancarResourceNotFoundExceptionAoBuscarAcompanhamentoDeOSInexistente() {
+        when(osRepositoryPort.buscarPorId(1L)).thenReturn(Optional.empty());
+
+        assertThrows(ResourceNotFoundException.class, () -> ordemServicoService.buscarParaAcompanhamento(1L, "chave-certa"));
+    }
+
+    @Test
     @DisplayName("Deve calcular o tempo médio de execução considerando apenas OS concluídas")
     void deveCalcularTempoMedioExecucao() {
         LocalDateTime abertura1 = LocalDateTime.of(2026, 1, 1, 10, 0);
@@ -284,9 +484,9 @@ class OrdemServicoServiceTest {
         LocalDateTime abertura2 = LocalDateTime.of(2026, 1, 2, 10, 0);
         LocalDateTime conclusao2 = LocalDateTime.of(2026, 1, 2, 11, 0);
 
-        OrdemServico osConcluida1 = new OrdemServico(1L, 1L, 1L, StatusOS.ENTREGUE, abertura1, null, conclusao1, "obs", new Preco(BigDecimal.ZERO), new Preco(BigDecimal.ZERO), new Preco(BigDecimal.ZERO), null, null);
-        OrdemServico osConcluida2 = new OrdemServico(2L, 1L, 1L, StatusOS.FINALIZADA, abertura2, null, conclusao2, "obs", new Preco(BigDecimal.ZERO), new Preco(BigDecimal.ZERO), new Preco(BigDecimal.ZERO), null, null);
-        OrdemServico osEmAndamento = new OrdemServico(3L, 1L, 1L, StatusOS.EM_EXECUCAO, LocalDateTime.now(), null, null, "obs", new Preco(BigDecimal.ZERO), new Preco(BigDecimal.ZERO), new Preco(BigDecimal.ZERO), null, null);
+        OrdemServico osConcluida1 = new OrdemServico(1L, 1L, 1L, StatusOS.ENTREGUE, abertura1, null, conclusao1, "obs", new Preco(BigDecimal.ZERO), new Preco(BigDecimal.ZERO), new Preco(BigDecimal.ZERO), null, null, null, null, null);
+        OrdemServico osConcluida2 = new OrdemServico(2L, 1L, 1L, StatusOS.FINALIZADA, abertura2, null, conclusao2, "obs", new Preco(BigDecimal.ZERO), new Preco(BigDecimal.ZERO), new Preco(BigDecimal.ZERO), null, null, null, null, null);
+        OrdemServico osEmAndamento = new OrdemServico(3L, 1L, 1L, StatusOS.EM_EXECUCAO, LocalDateTime.now(), null, null, "obs", new Preco(BigDecimal.ZERO), new Preco(BigDecimal.ZERO), new Preco(BigDecimal.ZERO), null, null, null, null, null);
 
         when(osRepositoryPort.buscarTodas()).thenReturn(List.of(osConcluida1, osConcluida2, osEmAndamento));
 
@@ -299,7 +499,7 @@ class OrdemServicoServiceTest {
     @Test
     @DisplayName("Deve retornar tempo médio zero quando não há OS concluídas")
     void deveRetornarTempoMedioZeroSemOSConcluidas() {
-        OrdemServico osEmAndamento = new OrdemServico(1L, 1L, 1L, StatusOS.RECEBIDA, LocalDateTime.now(), null, null, "obs", new Preco(BigDecimal.ZERO), new Preco(BigDecimal.ZERO), new Preco(BigDecimal.ZERO), null, null);
+        OrdemServico osEmAndamento = osComStatus(StatusOS.RECEBIDA);
         when(osRepositoryPort.buscarTodas()).thenReturn(List.of(osEmAndamento));
 
         TempoMedioExecucao resultado = ordemServicoService.calcularTempoMedioExecucao();

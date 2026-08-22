@@ -16,8 +16,11 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import br.com.fiap.adapters.in.web.DTO.Dados.Response;
+import br.com.fiap.adapters.in.web.DTO.OrdemServico.AdicionarPecaRequest;
+import br.com.fiap.adapters.in.web.DTO.OrdemServico.AdicionarServicoRequest;
 import br.com.fiap.adapters.in.web.DTO.OrdemServico.OrdemServicoCreateRequest;
 import br.com.fiap.adapters.in.web.DTO.OrdemServico.OrdemServicoResponse;
+import br.com.fiap.adapters.in.web.DTO.OrdemServico.RealizarDiagnosticoRequest;
 import br.com.fiap.adapters.in.web.DTO.OrdemServico.TempoMedioExecucaoResponse;
 import br.com.fiap.adapters.in.web.mapper.OrdemServicoMapper;
 import br.com.fiap.domain.entities.OrdemServico;
@@ -49,12 +52,13 @@ public class OrdemServicoController {
     @Operation(
         summary = "Criar uma nova Ordem de Serviço",
         description = """
-            Cria uma nova OS no sistema vinculando cliente, veículo, serviços e peças.
+            Cria uma nova OS no sistema, vinculando cliente e veículo. A OS nasce sem serviços/peças —
+            eles só podem ser adicionados depois que a OS entrar em diagnóstico (`EM_DIAGNOSTICO`),
+            via os endpoints `POST /{id}/servicos` e `POST /{id}/pecas`.
 
             **Fluxo inicial:**
-            - A OS é criada com status `RECEBIDA`
-            - Serviços e peças informados no corpo já são adicionados à OS
-            - O orçamento é calculado automaticamente
+            - A OS é criada com status `RECEBIDA`, contendo só a observação do problema relatado
+            - Uma chave de acesso (`chaveAcesso`) é gerada para a página pública de acompanhamento do cliente
 
             **Máquina de estados:**
             ```
@@ -77,17 +81,14 @@ public class OrdemServicoController {
                             "veiculoId": 1,
                             "status": "RECEBIDA",
                             "dataAbertura": "2026-08-12T10:30:00",
-                            "dataPrevistaEntrega": "2026-08-20T18:00:00",
+                            "dataPrevistaEntrega": null,
                             "observacoes": "Cliente relata barulho no freio",
-                            "valorServicos": 150.00,
-                            "valorPecas": 45.90,
-                            "valorTotal": 195.90,
-                            "servicos": [
-                                {"servicoId": 1, "nomeServico": "Troca de Óleo", "quantidade": 1, "precoUnitario": 150.00, "valorTotal": 150.00}
-                            ],
-                            "pecas": [
-                                {"pecaId": 1, "nomePeca": "Filtro de Óleo", "codigoPeca": "FIL001", "quantidade": 1, "precoUnitario": 45.90, "valorTotal": 45.90}
-                            ]
+                            "valorServicos": 0.00,
+                            "valorPecas": 0.00,
+                            "valorTotal": 0.00,
+                            "servicos": [],
+                            "pecas": [],
+                            "chaveAcesso": "3fa85f64-5717-4562-b3fc-2c963f66afa6"
                         }
                     }
                     """
@@ -95,7 +96,7 @@ public class OrdemServicoController {
         ),
         @ApiResponse(responseCode = "400", description = "Dados inválidos", content = @Content(
             examples = @ExampleObject(value = "{\"status\": \"error\", \"message\": \"clienteId: O ID do cliente é obrigatório\", \"dados\": null}"))),
-        @ApiResponse(responseCode = "404", description = "Cliente, veículo, serviço ou peça informado não encontrado", content = @Content(
+        @ApiResponse(responseCode = "404", description = "Cliente ou veículo informado não encontrado", content = @Content(
             examples = @ExampleObject(value = "{\"status\": \"error\", \"message\": \"Cliente não encontrado com ID: 1\", \"dados\": null}")))
     })
     @PostMapping
@@ -107,15 +108,88 @@ public class OrdemServicoController {
             @Valid @RequestBody OrdemServicoCreateRequest requestDTO) {
 
         OrdemServico osDomain = OrdemServicoMapper.toDomain(requestDTO);
-
-        OrdemServico osCriada = osUseCase.criarOS(
-                osDomain,
-                OrdemServicoMapper.toItensServicos(requestDTO),
-                OrdemServicoMapper.toItensPecas(requestDTO)
-        );
+        OrdemServico osCriada = osUseCase.criarOS(osDomain);
 
         return ResponseEntity.status(HttpStatus.CREATED).body(
                 new Response<>("success", "OS criada com sucesso", OrdemServicoMapper.toResponse(osCriada)));
+    }
+
+    @Operation(
+        summary = "Realizar diagnóstico da OS",
+        description = """
+            Transiciona a OS de `RECEBIDA` para `EM_DIAGNOSTICO` e registra, numa única chamada,
+            todos os serviços e peças identificados no diagnóstico.
+
+            Equivalente a chamar `PATCH /{id}/status/EM_DIAGNOSTICO` seguido de um `POST /{id}/servicos`
+            e `POST /{id}/pecas` para cada item — útil quando o diagnóstico já é conhecido por completo
+            no momento do registro. Os endpoints individuais continuam disponíveis para ajustes pontuais depois.
+            """
+    )
+    @ApiResponses(value = {
+        @ApiResponse(responseCode = "200", description = "Diagnóstico registrado com sucesso"),
+        @ApiResponse(responseCode = "400", description = "OS fora do status RECEBIDA", content = @Content(
+            examples = @ExampleObject(value = "{\"status\": \"error\", \"message\": \"Transição inválida: Em diagnóstico → Em diagnóstico. Próximos status válidos: []\", \"dados\": null}"))),
+        @ApiResponse(responseCode = "404", description = "OS, serviço ou peça não encontrado", content = @Content(
+            examples = @ExampleObject(value = "{\"status\": \"error\", \"message\": \"OS não encontrada com ID: 1\", \"dados\": null}")))
+    })
+    @PostMapping("/{id}/diagnostico")
+    public ResponseEntity<Response<OrdemServicoResponse>> realizarDiagnostico(
+            @Parameter(description = "ID da Ordem de Serviço", example = "1", required = true)
+            @PathVariable Long id,
+            @Valid @RequestBody RealizarDiagnosticoRequest requestDTO) {
+
+        OrdemServico os = osUseCase.realizarDiagnostico(
+                id,
+                OrdemServicoMapper.toItensServicoDiagnostico(requestDTO),
+                OrdemServicoMapper.toItensPecaDiagnostico(requestDTO),
+                requestDTO.dataPrevistaEntrega()
+        );
+
+        return ResponseEntity.ok(new Response<>("success", "Diagnóstico registrado com sucesso", OrdemServicoMapper.toResponse(os)));
+    }
+
+    @Operation(
+        summary = "Adicionar serviço à OS em diagnóstico",
+        description = "Adiciona um serviço do catálogo à OS, recalculando o orçamento automaticamente. Exige que a OS esteja em `EM_DIAGNOSTICO`."
+    )
+    @ApiResponses(value = {
+        @ApiResponse(responseCode = "200", description = "Serviço adicionado com sucesso"),
+        @ApiResponse(responseCode = "400", description = "OS fora do status EM_DIAGNOSTICO", content = @Content(
+            examples = @ExampleObject(value = "{\"status\": \"error\", \"message\": \"Não é possível adicionar serviços neste status.\", \"dados\": null}"))),
+        @ApiResponse(responseCode = "404", description = "OS ou serviço não encontrado", content = @Content(
+            examples = @ExampleObject(value = "{\"status\": \"error\", \"message\": \"Serviço não encontrado com ID: 1\", \"dados\": null}")))
+    })
+    @PostMapping("/{id}/servicos")
+    public ResponseEntity<Response<OrdemServicoResponse>> adicionarServico(
+            @Parameter(description = "ID da Ordem de Serviço", example = "1", required = true)
+            @PathVariable Long id,
+            @Valid @RequestBody AdicionarServicoRequest requestDTO) {
+
+        OrdemServico os = osUseCase.adicionarServico(id, requestDTO.servicoId(), requestDTO.quantidade());
+
+        return ResponseEntity.ok(new Response<>("success", "Serviço adicionado com sucesso", OrdemServicoMapper.toResponse(os)));
+    }
+
+    @Operation(
+        summary = "Adicionar peça à OS em diagnóstico",
+        description = "Adiciona uma peça do catálogo à OS, recalculando o orçamento automaticamente. Exige que a OS esteja em `EM_DIAGNOSTICO`."
+    )
+    @ApiResponses(value = {
+        @ApiResponse(responseCode = "200", description = "Peça adicionada com sucesso"),
+        @ApiResponse(responseCode = "400", description = "OS fora do status EM_DIAGNOSTICO", content = @Content(
+            examples = @ExampleObject(value = "{\"status\": \"error\", \"message\": \"Não é possível adicionar peças neste status.\", \"dados\": null}"))),
+        @ApiResponse(responseCode = "404", description = "OS ou peça não encontrada", content = @Content(
+            examples = @ExampleObject(value = "{\"status\": \"error\", \"message\": \"Peça não encontrada com ID: 1\", \"dados\": null}")))
+    })
+    @PostMapping("/{id}/pecas")
+    public ResponseEntity<Response<OrdemServicoResponse>> adicionarPeca(
+            @Parameter(description = "ID da Ordem de Serviço", example = "1", required = true)
+            @PathVariable Long id,
+            @Valid @RequestBody AdicionarPecaRequest requestDTO) {
+
+        OrdemServico os = osUseCase.adicionarPeca(id, requestDTO.pecaId(), requestDTO.quantidade());
+
+        return ResponseEntity.ok(new Response<>("success", "Peça adicionada com sucesso", OrdemServicoMapper.toResponse(os)));
     }
 
     @Operation(
@@ -300,44 +374,6 @@ public class OrdemServicoController {
         OrdemServico os = osUseCase.atualizarStatus(id, status);
 
         return ResponseEntity.ok(new Response<>("success", "Status atualizado com sucesso", OrdemServicoMapper.toResponse(os)));
-    }
-
-    @Operation(
-        summary = "Acompanhar progresso da OS (público)",
-        description = """
-            Endpoint **público** (não requer autenticação) para o cliente acompanhar o progresso da OS.
-
-            Retorna informações básicas do status, valores e previsão de entrega.
-
-            **Uso:** Ideal para implementação de tracking online para clientes.
-            """
-    )
-    @ApiResponses(value = {
-        @ApiResponse(responseCode = "200", description = "Progresso retornado com sucesso", content = @Content(
-            examples = @ExampleObject(value = """
-                {
-                    "status": "success",
-                    "message": "Progresso retornado com sucesso",
-                    "dados": {
-                        "id": 1,
-                        "status": "EM_EXECUCAO",
-                        "dataAbertura": "2026-08-12T10:30:00",
-                        "dataPrevistaEntrega": "2026-08-20T18:00:00",
-                        "valorTotal": 341.80
-                    }
-                }
-                """))),
-        @ApiResponse(responseCode = "404", description = "OS não encontrada", content = @Content(
-            examples = @ExampleObject(value = "{\"status\": \"error\", \"message\": \"OS não encontrada com ID: 1\", \"dados\": null}")))
-    })
-    @GetMapping("/{id}/acompanhar")
-    public ResponseEntity<Response<OrdemServicoResponse>> acompanhar(
-            @Parameter(description = "ID da Ordem de Serviço", example = "1", required = true)
-            @PathVariable Long id) {
-
-        OrdemServico os = osUseCase.buscarPorId(id);
-
-        return ResponseEntity.ok(new Response<>("success", "Progresso retornado com sucesso", OrdemServicoMapper.toResponse(os)));
     }
 
     @Operation(

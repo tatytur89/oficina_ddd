@@ -5,8 +5,9 @@ import java.util.List;
 
 import br.com.fiap.adapters.in.web.DTO.OrdemServico.OrdemServicoCreateRequest;
 import br.com.fiap.adapters.in.web.DTO.OrdemServico.OrdemServicoResponse;
+import br.com.fiap.adapters.in.web.DTO.OrdemServico.RealizarDiagnosticoRequest;
 import br.com.fiap.domain.entities.OrdemServico;
-import br.com.fiap.ports.in.ItemQuantidade;
+import br.com.fiap.ports.in.ItemDiagnostico;
 
 public class OrdemServicoMapper {
 
@@ -17,9 +18,12 @@ public class OrdemServicoMapper {
                 dto.veiculoId(),
                 null,
                 null,
-                dto.dataPrevistaEntrega(),
+                null,
                 null,
                 dto.observacoes(),
+                null,
+                null,
+                null,
                 null,
                 null,
                 null,
@@ -28,21 +32,21 @@ public class OrdemServicoMapper {
         );
     }
 
-    public static List<ItemQuantidade> toItensServicos(OrdemServicoCreateRequest dto) {
+    public static List<ItemDiagnostico> toItensServicoDiagnostico(RealizarDiagnosticoRequest dto) {
         if (dto.servicos() == null) {
             return Collections.emptyList();
         }
         return dto.servicos().stream()
-                .map(item -> new ItemQuantidade(item.servicoId(), item.quantidade()))
+                .map(item -> new ItemDiagnostico(item.servicoId(), item.quantidade()))
                 .toList();
     }
 
-    public static List<ItemQuantidade> toItensPecas(OrdemServicoCreateRequest dto) {
+    public static List<ItemDiagnostico> toItensPecaDiagnostico(RealizarDiagnosticoRequest dto) {
         if (dto.pecas() == null) {
             return Collections.emptyList();
         }
         return dto.pecas().stream()
-                .map(item -> new ItemQuantidade(item.pecaId(), item.quantidade()))
+                .map(item -> new ItemDiagnostico(item.pecaId(), item.quantidade()))
                 .toList();
     }
 

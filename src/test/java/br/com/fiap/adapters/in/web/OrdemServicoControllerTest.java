@@ -23,7 +23,9 @@ import java.time.LocalDateTime;
 import java.util.List;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
@@ -42,11 +44,11 @@ class OrdemServicoControllerTest {
     private OrdemServicoUseCase osUseCase;
 
     private static final OrdemServico OS = new OrdemServico(1L, 1L, 1L, StatusOS.RECEBIDA, LocalDateTime.now(), null, null, "obs",
-            new Preco(BigDecimal.ZERO), new Preco(BigDecimal.ZERO), new Preco(BigDecimal.ZERO), null, null);
+            new Preco(BigDecimal.ZERO), new Preco(BigDecimal.ZERO), new Preco(BigDecimal.ZERO), null, null, null, null, null);
 
     @Test
     void deveCriarOSComSucesso() throws Exception {
-        when(osUseCase.criarOS(any(), any(), any())).thenReturn(OS);
+        when(osUseCase.criarOS(any())).thenReturn(OS);
 
         mockMvc.perform(post("/api/v1/ordens-servico")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -57,12 +59,75 @@ class OrdemServicoControllerTest {
 
     @Test
     void deveRetornar404AoCriarOSComClienteInexistente() throws Exception {
-        when(osUseCase.criarOS(any(), any(), any()))
+        when(osUseCase.criarOS(any()))
                 .thenThrow(new ResourceNotFoundException("Cliente não encontrado com ID: 1"));
 
         mockMvc.perform(post("/api/v1/ordens-servico")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"clienteId\":1,\"veiculoId\":1,\"observacoes\":\"obs\"}"))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void deveRealizarDiagnosticoComSucesso() throws Exception {
+        when(osUseCase.realizarDiagnostico(eq(1L), any(), any(), any())).thenReturn(OS);
+
+        mockMvc.perform(post("/api/v1/ordens-servico/1/diagnostico")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"servicos\":[{\"servicoId\":1,\"quantidade\":1}],\"pecas\":[{\"pecaId\":1,\"quantidade\":2}]}"))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    void deveRetornar400AoDiagnosticarForaDeRecebida() throws Exception {
+        when(osUseCase.realizarDiagnostico(eq(1L), any(), any(), any()))
+                .thenThrow(new IllegalStateException("Transição inválida"));
+
+        mockMvc.perform(post("/api/v1/ordens-servico/1/diagnostico")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}"))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void deveAdicionarServicoComSucesso() throws Exception {
+        when(osUseCase.adicionarServico(1L, 1L, 1)).thenReturn(OS);
+
+        mockMvc.perform(post("/api/v1/ordens-servico/1/servicos")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"servicoId\":1,\"quantidade\":1}"))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    void deveRetornar400AoAdicionarServicoForaDeDiagnostico() throws Exception {
+        when(osUseCase.adicionarServico(anyLong(), anyLong(), anyInt()))
+                .thenThrow(new IllegalStateException("Não é possível adicionar serviços neste status."));
+
+        mockMvc.perform(post("/api/v1/ordens-servico/1/servicos")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"servicoId\":1,\"quantidade\":1}"))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void deveAdicionarPecaComSucesso() throws Exception {
+        when(osUseCase.adicionarPeca(1L, 1L, 2)).thenReturn(OS);
+
+        mockMvc.perform(post("/api/v1/ordens-servico/1/pecas")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"pecaId\":1,\"quantidade\":2}"))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    void deveRetornar404AoAdicionarPecaInexistente() throws Exception {
+        when(osUseCase.adicionarPeca(anyLong(), anyLong(), anyInt()))
+                .thenThrow(new ResourceNotFoundException("Peça não encontrada com ID: 1"));
+
+        mockMvc.perform(post("/api/v1/ordens-servico/1/pecas")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"pecaId\":1,\"quantidade\":2}"))
                 .andExpect(status().isNotFound());
     }
 
@@ -131,14 +196,6 @@ class OrdemServicoControllerTest {
 
         mockMvc.perform(patch("/api/v1/ordens-servico/1/status/ENTREGUE"))
                 .andExpect(status().isBadRequest());
-    }
-
-    @Test
-    void deveAcompanharOSPublicamente() throws Exception {
-        when(osUseCase.buscarPorId(1L)).thenReturn(OS);
-
-        mockMvc.perform(get("/api/v1/ordens-servico/1/acompanhar"))
-                .andExpect(status().isOk());
     }
 
     @Test

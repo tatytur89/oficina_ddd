@@ -23,7 +23,10 @@ public record OrdemServicoResponse(
         @Schema(example = "91.80") BigDecimal valorPecas,
         @Schema(example = "341.80") BigDecimal valorTotal,
         List<ServicoOSResponse> servicos,
-        List<PecaOSResponse> pecas
+        List<PecaOSResponse> pecas,
+        @Schema(description = "Chave de acesso para a página pública de acompanhamento/aprovação/avaliação do cliente", example = "3fa85f64-5717-4562-b3fc-2c963f66afa6") String chaveAcesso,
+        @Schema(description = "Nota de avaliação do cliente (1-5), preenchida após a entrega", example = "5") Integer notaAvaliacao,
+        @Schema(description = "Comentário de avaliação do cliente", example = "Ótimo atendimento!") String comentarioAvaliacao
 ) {
     public OrdemServicoResponse(OrdemServico os) {
         this(
@@ -39,7 +42,10 @@ public record OrdemServicoResponse(
             os.getValorPecas().getValor(),
             os.getValorTotal().getValor(),
             os.getServicos().stream().map(ServicoOSResponse::new).toList(),
-            os.getPecas().stream().map(PecaOSResponse::new).toList()
+            os.getPecas().stream().map(PecaOSResponse::new).toList(),
+            os.getChaveAcesso(),
+            os.getNotaAvaliacao(),
+            os.getComentarioAvaliacao()
         );
     }
 

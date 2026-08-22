@@ -268,7 +268,7 @@ class PecaServiceTest {
     @DisplayName("Deve lançar ResourceInUseException ao excluir peça vinculada a OS pendente de execução")
     void deveLancarResourceInUseExceptionAoExcluirPecaComOSPendente() {
         Peca pecaExistente = novaPeca(1L, "FIL001", 50, 10);
-        OrdemServico os = new OrdemServico(1L, 1L, 1L, null, null, null, null, "obs", null, null, null, null, null);
+        OrdemServico os = new OrdemServico(1L, 1L, 1L, null, null, null, null, "obs", null, null, null, null, null, null, null, null);
         when(repositoryPort.buscarPorId(1L)).thenReturn(Optional.of(pecaExistente));
         when(osRepositoryPort.buscarPorPecaIdEStatus(eq(1L), any())).thenReturn(List.of(os));
 

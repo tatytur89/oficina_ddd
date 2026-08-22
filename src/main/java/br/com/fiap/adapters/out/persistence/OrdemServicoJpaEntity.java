@@ -49,6 +49,15 @@ public class OrdemServicoJpaEntity {
     @Column(nullable = false)
     private BigDecimal valorTotal;
 
+    // Sem nullable=false: Hibernate com ddl-auto=update falha ao adicionar coluna NOT NULL
+    // em tabela já populada (ALTER TABLE ... ADD COLUMN ... NOT NULL sem DEFAULT). A não-nulidade
+    // de fato é garantida pela aplicação (gerada em OrdemServicoService.criarOS).
+    private String chaveAcesso;
+
+    private Integer notaAvaliacao;
+
+    private String comentarioAvaliacao;
+
     @OneToMany(cascade = CascadeType.ALL, orphanRemoval = true)
     @JoinColumn(name = "ordem_servico_id")
     private List<ServicoOSJpaEntity> servicos = new ArrayList<>();
@@ -62,7 +71,8 @@ public class OrdemServicoJpaEntity {
     public OrdemServicoJpaEntity(Long id, Long clienteId, Long veiculoId, String status,
                                   LocalDateTime dataAbertura, LocalDateTime dataPrevistaEntrega,
                                   LocalDateTime dataConclusao, String observacoes,
-                                  BigDecimal valorServicos, BigDecimal valorPecas, BigDecimal valorTotal) {
+                                  BigDecimal valorServicos, BigDecimal valorPecas, BigDecimal valorTotal,
+                                  String chaveAcesso, Integer notaAvaliacao, String comentarioAvaliacao) {
         this.id = id;
         this.clienteId = clienteId;
         this.veiculoId = veiculoId;
@@ -74,6 +84,9 @@ public class OrdemServicoJpaEntity {
         this.valorServicos = valorServicos;
         this.valorPecas = valorPecas;
         this.valorTotal = valorTotal;
+        this.chaveAcesso = chaveAcesso;
+        this.notaAvaliacao = notaAvaliacao;
+        this.comentarioAvaliacao = comentarioAvaliacao;
     }
 
     public Long getId() { return id; }
@@ -87,6 +100,9 @@ public class OrdemServicoJpaEntity {
     public BigDecimal getValorServicos() { return valorServicos; }
     public BigDecimal getValorPecas() { return valorPecas; }
     public BigDecimal getValorTotal() { return valorTotal; }
+    public String getChaveAcesso() { return chaveAcesso; }
+    public Integer getNotaAvaliacao() { return notaAvaliacao; }
+    public String getComentarioAvaliacao() { return comentarioAvaliacao; }
     public List<ServicoOSJpaEntity> getServicos() { return servicos; }
     public List<PecaOSJpaEntity> getPecas() { return pecas; }
 

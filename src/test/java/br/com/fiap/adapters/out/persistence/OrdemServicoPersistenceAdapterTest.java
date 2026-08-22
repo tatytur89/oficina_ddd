@@ -7,7 +7,9 @@ import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest;
 import org.springframework.context.annotation.Import;
 
 import br.com.fiap.domain.entities.OrdemServico;
+import br.com.fiap.domain.entities.Peca;
 import br.com.fiap.domain.entities.PecaOS;
+import br.com.fiap.domain.entities.Servico;
 import br.com.fiap.domain.valueobjects.Preco;
 import br.com.fiap.domain.valueobjects.StatusOS;
 
@@ -27,7 +29,7 @@ class OrdemServicoPersistenceAdapterTest {
 
     private OrdemServico novaOS(Long clienteId, Long veiculoId, StatusOS status, LocalDateTime dataAbertura) {
         return new OrdemServico(null, clienteId, veiculoId, status, dataAbertura, null, null, "obs",
-                new Preco(BigDecimal.ZERO), new Preco(BigDecimal.ZERO), new Preco(BigDecimal.ZERO), null, null);
+                new Preco(BigDecimal.ZERO), new Preco(BigDecimal.ZERO), new Preco(BigDecimal.ZERO), null, null, "chave-teste", null, null);
     }
 
     @Test
@@ -37,6 +39,23 @@ class OrdemServicoPersistenceAdapterTest {
 
         assertNotNull(salva.getId());
         assertEquals(StatusOS.RECEBIDA, salva.getStatus());
+    }
+
+    @Test
+    @DisplayName("Deve permitir adicionar serviço e peça a uma OS recarregada do banco")
+    void devePermitirAdicionarItensAposRecarregarDoBanco() {
+        OrdemServico salva = osPersistenceAdapter.salvar(novaOS(1L, 1L, StatusOS.EM_DIAGNOSTICO, LocalDateTime.now()));
+
+        OrdemServico recarregada = osPersistenceAdapter.buscarPorId(salva.getId()).orElseThrow();
+
+        Servico servico = new Servico(1L, "Troca de Óleo", "Descrição", new Preco(BigDecimal.valueOf(150.00)),
+                br.com.fiap.domain.valueobjects.TipoServico.MANUTENCAO, 60);
+        Peca peca = new Peca(1L, "Filtro de Óleo", "Descrição", "FIL001", new Preco(BigDecimal.valueOf(45.90)), 50, 10);
+
+        assertDoesNotThrow(() -> recarregada.adicionarServico(servico, 1));
+        assertDoesNotThrow(() -> recarregada.adicionarPeca(peca, 1));
+        assertEquals(1, recarregada.getServicos().size());
+        assertEquals(1, recarregada.getPecas().size());
     }
 
     @Test
@@ -108,7 +127,7 @@ class OrdemServicoPersistenceAdapterTest {
     void deveBuscarPorPecaIdEStatus() {
         PecaOS pecaOS = new PecaOS(1L, "Filtro de Óleo", "FIL001", 2, new Preco(BigDecimal.valueOf(45.90)), new Preco(BigDecimal.valueOf(91.80)));
         OrdemServico osComPeca = new OrdemServico(null, 1L, 1L, StatusOS.RECEBIDA, LocalDateTime.now(), null, null, "obs",
-                new Preco(BigDecimal.ZERO), new Preco(BigDecimal.valueOf(91.80)), new Preco(BigDecimal.valueOf(91.80)), null, List.of(pecaOS));
+                new Preco(BigDecimal.ZERO), new Preco(BigDecimal.valueOf(91.80)), new Preco(BigDecimal.valueOf(91.80)), null, List.of(pecaOS), "chave-teste", null, null);
         osPersistenceAdapter.salvar(osComPeca);
 
         List<OrdemServico> resultado = osPersistenceAdapter.buscarPorPecaIdEStatus(1L,
@@ -122,7 +141,7 @@ class OrdemServicoPersistenceAdapterTest {
     void naoDeveEncontrarPorPecaIdQuandoStatusNaoBate() {
         PecaOS pecaOS = new PecaOS(1L, "Filtro de Óleo", "FIL001", 2, new Preco(BigDecimal.valueOf(45.90)), new Preco(BigDecimal.valueOf(91.80)));
         OrdemServico osComPeca = new OrdemServico(null, 1L, 1L, StatusOS.ENTREGUE, LocalDateTime.now(), null, LocalDateTime.now(), "obs",
-                new Preco(BigDecimal.ZERO), new Preco(BigDecimal.valueOf(91.80)), new Preco(BigDecimal.valueOf(91.80)), null, List.of(pecaOS));
+                new Preco(BigDecimal.ZERO), new Preco(BigDecimal.valueOf(91.80)), new Preco(BigDecimal.valueOf(91.80)), null, List.of(pecaOS), "chave-teste", null, null);
         osPersistenceAdapter.salvar(osComPeca);
 
         List<OrdemServico> resultado = osPersistenceAdapter.buscarPorPecaIdEStatus(1L,

@@ -4,6 +4,7 @@ import java.math.BigDecimal;
 import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.UUID;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -15,7 +16,7 @@ import br.com.fiap.domain.entities.PecaOS;
 import br.com.fiap.domain.entities.Servico;
 import br.com.fiap.domain.valueobjects.Preco;
 import br.com.fiap.domain.valueobjects.StatusOS;
-import br.com.fiap.ports.in.ItemQuantidade;
+import br.com.fiap.ports.in.ItemDiagnostico;
 import br.com.fiap.ports.in.OrdemServicoUseCase;
 import br.com.fiap.ports.in.PecaUseCase;
 import br.com.fiap.ports.in.ServicoUseCase;
@@ -47,7 +48,7 @@ public class OrdemServicoService implements OrdemServicoUseCase {
 
     @Override
     @Transactional
-    public OrdemServico criarOS(OrdemServico os, List<ItemQuantidade> servicosSolicitados, List<ItemQuantidade> pecasSolicitadas) {
+    public OrdemServico criarOS(OrdemServico os) {
         clienteRepositoryPort.buscarPorId(os.getClienteId())
                 .orElseThrow(() -> new ResourceNotFoundException("Cliente não encontrado com ID: " + os.getClienteId()));
 
@@ -60,31 +61,73 @@ public class OrdemServicoService implements OrdemServicoUseCase {
             os.getVeiculoId(),
             StatusOS.RECEBIDA,
             LocalDateTime.now(),
-            os.getDataPrevistaEntrega(),
+            null,
             null,
             os.getObservacoes(),
             new Preco(BigDecimal.ZERO),
             new Preco(BigDecimal.ZERO),
             new Preco(BigDecimal.ZERO),
             null,
+            null,
+            UUID.randomUUID().toString(),
+            null,
             null
         );
 
-        if (servicosSolicitados != null) {
-            for (ItemQuantidade item : servicosSolicitados) {
-                Servico servico = servicoUseCase.buscarPorId(item.id());
-                novaOS.adicionarServico(servico, item.quantidade());
-            }
-        }
-
-        if (pecasSolicitadas != null) {
-            for (ItemQuantidade item : pecasSolicitadas) {
-                Peca peca = pecaUseCase.buscarPorId(item.id());
-                novaOS.adicionarPeca(peca, item.quantidade());
-            }
-        }
-
         return osRepositoryPort.salvar(novaOS);
+    }
+
+    @Override
+    @Transactional
+    public OrdemServico realizarDiagnostico(Long osId, List<ItemDiagnostico> servicos, List<ItemDiagnostico> pecas, LocalDateTime dataPrevistaEntrega) {
+        OrdemServico os = osRepositoryPort.buscarPorId(osId)
+                .orElseThrow(() -> new ResourceNotFoundException("OS não encontrada com ID: " + osId));
+
+        os.transicionarPara(StatusOS.EM_DIAGNOSTICO);
+
+        if (dataPrevistaEntrega != null) {
+            os.definirDataPrevistaEntrega(dataPrevistaEntrega);
+        }
+
+        if (servicos != null) {
+            for (ItemDiagnostico item : servicos) {
+                Servico servico = servicoUseCase.buscarPorId(item.id());
+                os.adicionarServico(servico, item.quantidade());
+            }
+        }
+
+        if (pecas != null) {
+            for (ItemDiagnostico item : pecas) {
+                Peca peca = pecaUseCase.buscarPorId(item.id());
+                os.adicionarPeca(peca, item.quantidade());
+            }
+        }
+
+        return osRepositoryPort.salvar(os);
+    }
+
+    @Override
+    @Transactional
+    public OrdemServico adicionarServico(Long osId, Long servicoId, int quantidade) {
+        OrdemServico os = osRepositoryPort.buscarPorId(osId)
+                .orElseThrow(() -> new ResourceNotFoundException("OS não encontrada com ID: " + osId));
+
+        Servico servico = servicoUseCase.buscarPorId(servicoId);
+        os.adicionarServico(servico, quantidade);
+
+        return osRepositoryPort.salvar(os);
+    }
+
+    @Override
+    @Transactional
+    public OrdemServico adicionarPeca(Long osId, Long pecaId, int quantidade) {
+        OrdemServico os = osRepositoryPort.buscarPorId(osId)
+                .orElseThrow(() -> new ResourceNotFoundException("OS não encontrada com ID: " + osId));
+
+        Peca peca = pecaUseCase.buscarPorId(pecaId);
+        os.adicionarPeca(peca, quantidade);
+
+        return osRepositoryPort.salvar(os);
     }
 
     @Override
@@ -128,9 +171,7 @@ public class OrdemServicoService implements OrdemServicoUseCase {
         os.transicionarPara(novoStatus);
 
         if (novoStatus == StatusOS.EM_EXECUCAO) {
-            for (PecaOS item : os.getPecas()) {
-                pecaUseCase.baixarEstoque(item.getPecaId(), item.getQuantidade());
-            }
+            baixarEstoqueDosItens(os);
         }
 
         return osRepositoryPort.salvar(os);
@@ -144,6 +185,45 @@ public class OrdemServicoService implements OrdemServicoUseCase {
 
         os.enviarOrcamento();
         return osRepositoryPort.salvar(os);
+    }
+
+    @Override
+    @Transactional
+    public OrdemServico aprovarOrcamento(Long id, String chave) {
+        OrdemServico os = osRepositoryPort.buscarPorId(id)
+            .orElseThrow(() -> new ResourceNotFoundException("OS não encontrada com ID: " + id));
+
+        os.aprovarOrcamento(chave);
+        baixarEstoqueDosItens(os);
+
+        return osRepositoryPort.salvar(os);
+    }
+
+    @Override
+    @Transactional
+    public OrdemServico avaliarServico(Long id, String chave, int nota, String comentario) {
+        OrdemServico os = osRepositoryPort.buscarPorId(id)
+            .orElseThrow(() -> new ResourceNotFoundException("OS não encontrada com ID: " + id));
+
+        os.validarChaveAcesso(chave);
+        os.avaliarServico(nota, comentario);
+
+        return osRepositoryPort.salvar(os);
+    }
+
+    @Override
+    public OrdemServico buscarParaAcompanhamento(Long id, String chave) {
+        OrdemServico os = osRepositoryPort.buscarPorId(id)
+            .orElseThrow(() -> new ResourceNotFoundException("OS não encontrada com ID: " + id));
+
+        os.validarChaveAcesso(chave);
+        return os;
+    }
+
+    private void baixarEstoqueDosItens(OrdemServico os) {
+        for (PecaOS item : os.getPecas()) {
+            pecaUseCase.baixarEstoque(item.getPecaId(), item.getQuantidade());
+        }
     }
 
     @Override

@@ -118,6 +118,56 @@ Este documento registra as principais decisões de arquitetura e design do proje
 
 **Decisão:** testes unitários puros para domínio e mappers (sem contexto Spring), `@DataJpaTest` com H2 para os adaptadores de persistência (testando o mapeamento objeto-relacional de verdade), `@WebMvcTest` com o *use case* mockado para os controllers (testando roteamento, validação e serialização, não a regra de negócio), e testes unitários com Mockito para os *services* (testando a regra de negócio isolada do HTTP e do banco).
 
-**Justificativa:** cada camada é testada no nível de abstração certo — um teste de controller não deveria falhar por causa de uma regra de negócio, e um teste de service não deveria depender de um banco H2 subindo. Essa separação também tornou os testes rápidos: a suíte completa (286 testes) roda em menos de 20 segundos.
+**Justificativa:** cada camada é testada no nível de abstração certo — um teste de controller não deveria falhar por causa de uma regra de negócio, e um teste de service não deveria depender de um banco H2 subindo. Essa separação também tornou os testes rápidos: a suíte completa (mais de 300 testes) roda em menos de 20 segundos.
 
 **Alternativas consideradas:** testes de ponta a ponta (`@SpringBootTest` completo, com banco e segurança reais) para todos os cenários foram descartados como estratégia principal por serem lentos e por acoplar teste de uma camada a todas as outras — um teste assim ficaria vermelho por motivos alheios ao que está sendo verificado. Ainda assim, esse tipo de teste continua sendo útil de forma pontual (ver observação sobre teste de integração de segurança nas pendências do projeto).
+
+---
+
+## 11. Ator interno único, baseado em experiência real de PCM
+
+**Contexto:** o fluxo de OS tem etapas que soam como se exigissem papéis de usuário distintos (quem diagnostica, quem orça, quem executa). O edital também sugere atores como "Mecânico" e "Atendente".
+
+**Decisão:** manter um único papel interno autenticado (`ROLE_ADMIN`) responsável por todas as transições de status da OS, em vez de fragmentar em `ROLE_MECANICO`/`ROLE_ATENDENTE`/`ROLE_ADMIN`.
+
+**Justificativa:** baseado em experiência prática com PCM (Planejamento e Controle de Manutenção) em manutenção corretiva real — o mecânico não opera o sistema; ele entrega um relato/documento físico, e é a equipe administrativa quem lança o status no sistema. Nenhum dos "papéis" sugeridos pelo edital corresponde de fato a alguém que senta no computador; são todos a mesma pessoa/setor sob nomes diferentes. Fragmentar os papéis criaria uma distinção que não existe na operação real que o sistema está modelando.
+
+**Alternativas consideradas:** múltiplos papéis internos (`ROLE_MECANICO`, `ROLE_ATENDENTE`) foram descartados por não corresponderem a nenhuma divisão real de quem opera o sistema, adicionando complexidade de autorização sem ganho de fidelidade ao processo de negócio.
+
+---
+
+## 12. Chave de acesso por OS para consulta, aprovação e avaliação do cliente
+
+**Contexto:** o cliente não tem login no sistema, mas precisa (a) consultar o progresso da própria OS, (b) aprovar o orçamento e (c) avaliar o serviço após a entrega — sem que isso vaze dados de outras OS. Uma primeira versão do endpoint público de acompanhamento (`GET /acompanhar` por ID sequencial, sem nenhuma verificação) permitia que qualquer pessoa trocasse o ID na URL e visse a OS de outro cliente (IDOR).
+
+**Decisão:** cada OS recebe uma `chaveAcesso` única (UUID) gerada na criação. Essa mesma chave é usada para as três ações — consultar, aprovar e avaliar — através de uma página HTML renderizada com Thymeleaf (`GET /acompanhamento/{id}?chave=...`, `POST /acompanhamento/{id}/aprovar`, `POST /acompanhamento/{id}/avaliar`), fora do prefixo `/api/v1` já que deixou de ser um endpoint JSON. **A chave não expira por status** — permanece válida durante toda a vida da OS, inclusive após `ENTREGUE`.
+
+> Revisão: a versão original desta decisão previa a chave expirando quando a OS chegasse a `ENTREGUE`. Isso foi revertido ao adicionar a avaliação do cliente (item 14) — o cliente precisa continuar usando a mesma chave *depois* da entrega para avaliar o serviço, então uma expiração nesse ponto quebraria exatamente o fluxo que ela deveria habilitar. A regra de negócio mudou de "a chave morre quando não há mais nada a fazer" para "a chave vive enquanto a OS existir".
+
+**Justificativa:** resolve o IDOR (sem a chave certa, nenhum dado da OS é exposto) e transforma a aprovação e a avaliação em ações reais do cliente, não um `PATCH` genérico feito pelo administrador em nome dele. Usar a mesma chave para as três ações evita gerenciar múltiplos segredos por OS. A página é renderizada com Thymeleaf (dependência nova) em vez de HTML montado como `String`, porque a página tem lógica condicional (botão de aprovação só aparece em `AGUARDANDO_APROVACAO`, formulário de avaliação só em `ENTREGUE` sem avaliação prévia) e estilo próprio — o que se beneficia de um motor de template em vez de concatenação manual.
+
+**Alternativas consideradas:** exigir CPF/CNPJ do cliente em vez de uma chave gerada foi descartado por ser uma prova de identidade mais fraca (documento não é secreto); um token separado por ação (um para consulta, outro para aprovação, outro para avaliação) foi descartado por adicionar segredos extras sem benefício de segurança adicional, já que a máquina de estados e a checagem de "já avaliada" já impedem reuso indevido; devolver HTML como `String` sem Thymeleaf foi descartado pela lógica condicional e estilo exigidos pela página.
+
+---
+
+## 13. Criação da OS separada do diagnóstico
+
+**Contexto:** o corpo de criação da OS (`POST /ordens-servico`) originalmente aceitava `servicos`/`pecas` e `dataPrevistaEntrega` já no ato da criação, e a entidade permitia adicionar itens tanto em `RECEBIDA` quanto em `EM_DIAGNOSTICO`. Isso permitia — e a própria forma da API convidava a isso — "diagnosticar" o veículo (incluindo estimar prazo de entrega) no mesmo instante em que a OS era aberta, o que não corresponde ao processo real: o diagnóstico é uma etapa posterior, feita depois que o veículo já está na oficina, e não dá pra estimar prazo de entrega antes de saber o que precisa ser feito.
+
+**Decisão:** `POST /ordens-servico` passa a aceitar só `clienteId`, `veiculoId` e `observacoes` — a OS nasce em `RECEBIDA` sempre vazia, sem itens nem previsão de entrega. Serviços, peças e `dataPrevistaEntrega` só podem ser definidos depois, e a entidade (`OrdemServico.adicionarServico`/`adicionarPeca`) passa a exigir `EM_DIAGNOSTICO` — `RECEBIDA` não é mais um status válido para isso. Dois caminhos ficam disponíveis para registrar o diagnóstico: `POST /{id}/diagnostico` (transiciona `RECEBIDA → EM_DIAGNOSTICO`, registra todos os itens e a previsão de entrega numa chamada só, para quando o diagnóstico já é conhecido por completo) ou, separadamente, `PATCH /{id}/status/EM_DIAGNOSTICO` seguido de `POST /{id}/servicos`/`POST /{id}/pecas` item a item (para ajustes pontuais depois — nesse caso, a previsão de entrega definida pelo `/diagnostico` permanece até ser alterada).
+
+**Justificativa:** alinha o código ao processo de negócio real (recebe o veículo → diagnostica → só então registra o que será feito) e elimina uma forma de contornar a máquina de estados sem violar tecnicamente nenhuma regra. O `enviarOrcamento` já exigia `EM_DIAGNOSTICO`, então essa mudança só torna consistente uma exigência que já existia parcialmente. O endpoint combinado (`/diagnostico`) evita que registrar N itens exija N+1 chamadas (uma de transição + uma por item) no caso comum de o diagnóstico já estar todo definido; os endpoints individuais continuam existindo para quando só um item precisa ser corrigido ou adicionado depois.
+
+**Alternativas consideradas:** manter como estava, tratando a criação com itens já populados como um atalho aceito para casos simples (ex.: cliente já sabe exatamente o que quer, sem precisar de diagnóstico) — descartado porque abriria uma exceção não documentada à regra de negócio, difícil de justificar de forma consistente para todos os casos.
+
+---
+
+## 14. Avaliação do cliente na entrega
+
+**Contexto:** o requisito de negócio para o status `ENTREGUE` prevê que o cliente, ao receber o veículo, classifique o serviço prestado — não é só o fim da máquina de estados, é um ponto de coleta de feedback.
+
+**Decisão:** `OrdemServico` ganha dois campos, `notaAvaliacao` (1 a 5) e `comentarioAvaliacao` (opcional), preenchidos via `OrdemServico.avaliarServico(nota, comentario)` — que exige `status == ENTREGUE` e rejeita uma segunda avaliação. A ação é exposta na mesma página pública de acompanhamento (`POST /acompanhamento/{id}/avaliar`), usando a mesma `chaveAcesso` da OS (ver item 12).
+
+**Justificativa:** a avaliação é inerentemente ligada a uma única OS entregue — não existe "reavaliar" nem múltiplas avaliações da mesma OS — então os dois campos direto na entidade (em vez de uma tabela/entidade separada) refletem exatamente essa cardinalidade 1:1, sem indireção desnecessária. Bloquear reavaliação na própria entidade (`if (notaAvaliacao != null)`) mantém essa invariante garantida no domínio, não só na camada web.
+
+**Alternativas consideradas:** modelar a avaliação como uma entidade própria com histórico de avaliações foi descartado por complexidade desnecessária — uma OS só é entregue uma vez, então não há histórico a manter; permitir reavaliação (sobrescrever a nota) foi descartado por não haver requisito de negócio para isso e por poder mascarar avaliações genuínas.

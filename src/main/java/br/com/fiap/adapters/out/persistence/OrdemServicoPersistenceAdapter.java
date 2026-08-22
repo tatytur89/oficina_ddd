@@ -37,7 +37,10 @@ public class OrdemServicoPersistenceAdapter implements OrdemServicoRepositoryPor
             os.getObservacoes(),
             os.getValorServicos().getValor(),
             os.getValorPecas().getValor(),
-            os.getValorTotal().getValor()
+            os.getValorTotal().getValor(),
+            os.getChaveAcesso(),
+            os.getNotaAvaliacao(),
+            os.getComentarioAvaliacao()
         );
 
         List<ServicoOSJpaEntity> servicoEntities = os.getServicos().stream()
@@ -138,7 +141,10 @@ public class OrdemServicoPersistenceAdapter implements OrdemServicoRepositoryPor
             new Preco(entity.getValorPecas()),
             new Preco(entity.getValorTotal()),
             servicos,
-            pecas
+            pecas,
+            entity.getChaveAcesso(),
+            entity.getNotaAvaliacao(),
+            entity.getComentarioAvaliacao()
         );
     }
 }

@@ -14,6 +14,10 @@
       }
     ]
   },
+  "variable": [
+    { "key": "token", "value": "" },
+    { "key": "chaveAcesso", "value": "" }
+  ],
   "item": [
     {
       "name": "Autenticacao",
@@ -27,7 +31,7 @@
                 "type": "text/javascript",
                 "exec": [
                   "const body = pm.response.json();",
-                  "if (body.token) pm.collectionVariables.set('token', body.token);"
+                  "if (body.dados && body.dados.token) pm.collectionVariables.set('token', body.dados.token);"
                 ]
               }
             }
@@ -231,11 +235,50 @@
       "item": [
         {
           "name": "Criar OS",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const body = pm.response.json();",
+                  "if (body.dados && body.dados.chaveAcesso) pm.collectionVariables.set('chaveAcesso', body.dados.chaveAcesso);"
+                ]
+              }
+            }
+          ],
           "request": {
             "method": "POST",
             "header": [{"key": "Content-Type", "value": "application/json"}],
-            "body": {"mode": "raw", "raw": "{\n  \"clienteId\": 1,\n  \"veiculoId\": 1,\n  \"dataPrevistaEntrega\": \"2026-08-30T18:00:00\",\n  \"observacoes\": \"Ruido no freio dianteiro\",\n  \"servicos\": [{\n    \"servicoId\": 1,\n    \"quantidade\": 1\n  }],\n  \"pecas\": [{\n    \"pecaId\": 1,\n    \"quantidade\": 1\n  }]\n}", "options": {"raw": {"language": "json"}}},
+            "body": {"mode": "raw", "raw": "{\n  \"clienteId\": 1,\n  \"veiculoId\": 1,\n  \"observacoes\": \"Ruido no freio dianteiro\"\n}", "options": {"raw": {"language": "json"}}},
             "url": {"raw": "http://localhost:8089/api/v1/ordens-servico", "host": ["http://localhost:8089"], "path": ["api", "v1", "ordens-servico"]}
+          }
+        },
+        {
+          "name": "Realizar diagnostico da OS",
+          "request": {
+            "method": "POST",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "body": {"mode": "raw", "raw": "{\n  \"servicos\": [{\n    \"servicoId\": 1,\n    \"quantidade\": 1\n  }],\n  \"pecas\": [{\n    \"pecaId\": 1,\n    \"quantidade\": 1\n  }],\n  \"dataPrevistaEntrega\": \"2026-08-30T18:00:00\"\n}", "options": {"raw": {"language": "json"}}},
+            "url": {"raw": "http://localhost:8089/api/v1/ordens-servico/1/diagnostico", "host": ["http://localhost:8089"], "path": ["api", "v1", "ordens-servico", "1", "diagnostico"]}
+          }
+        },
+        {
+          "name": "Adicionar servico a OS",
+          "request": {
+            "method": "POST",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "body": {"mode": "raw", "raw": "{\n  \"servicoId\": 1,\n  \"quantidade\": 1\n}", "options": {"raw": {"language": "json"}}},
+            "url": {"raw": "http://localhost:8089/api/v1/ordens-servico/1/servicos", "host": ["http://localhost:8089"], "path": ["api", "v1", "ordens-servico", "1", "servicos"]}
+          }
+        },
+        {
+          "name": "Adicionar peca a OS",
+          "request": {
+            "method": "POST",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "body": {"mode": "raw", "raw": "{\n  \"pecaId\": 1,\n  \"quantidade\": 1\n}", "options": {"raw": {"language": "json"}}},
+            "url": {"raw": "http://localhost:8089/api/v1/ordens-servico/1/pecas", "host": ["http://localhost:8089"], "path": ["api", "v1", "ordens-servico", "1", "pecas"]}
           }
         },
         {
@@ -267,8 +310,16 @@
           "request": {"method": "PATCH", "url": {"raw": "http://localhost:8089/api/v1/ordens-servico/1/status/EM_DIAGNOSTICO", "host": ["http://localhost:8089"], "path": ["api", "v1", "ordens-servico", "1", "status", "EM_DIAGNOSTICO"]}}
         },
         {
-          "name": "Acompanhar OS (publico)",
-          "request": {"method": "GET", "auth": {"type": "noauth"}, "url": {"raw": "http://localhost:8089/api/v1/ordens-servico/1/acompanhar", "host": ["http://localhost:8089"], "path": ["api", "v1", "ordens-servico", "1", "acompanhar"]}}
+          "name": "Acompanhar OS (pagina publica HTML)",
+          "request": {"method": "GET", "auth": {"type": "noauth"}, "url": {"raw": "http://localhost:8089/acompanhamento/1?chave={{chaveAcesso}}", "host": ["http://localhost:8089"], "path": ["acompanhamento", "1"], "query": [{"key": "chave", "value": "{{chaveAcesso}}"}]}}
+        },
+        {
+          "name": "Aprovar orcamento (publico)",
+          "request": {"method": "POST", "auth": {"type": "noauth"}, "url": {"raw": "http://localhost:8089/acompanhamento/1/aprovar?chave={{chaveAcesso}}", "host": ["http://localhost:8089"], "path": ["acompanhamento", "1", "aprovar"], "query": [{"key": "chave", "value": "{{chaveAcesso}}"}]}}
+        },
+        {
+          "name": "Avaliar servico (publico)",
+          "request": {"method": "POST", "auth": {"type": "noauth"}, "url": {"raw": "http://localhost:8089/acompanhamento/1/avaliar?chave={{chaveAcesso}}&nota=5&comentario=Otimo atendimento", "host": ["http://localhost:8089"], "path": ["acompanhamento", "1", "avaliar"], "query": [{"key": "chave", "value": "{{chaveAcesso}}"}, {"key": "nota", "value": "5"}, {"key": "comentario", "value": "Otimo atendimento"}]}}
         },
         {
           "name": "Tempo medio de execucao",

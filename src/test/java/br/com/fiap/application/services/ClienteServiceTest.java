@@ -207,7 +207,7 @@ class ClienteServiceTest {
     @DisplayName("Deve lançar ResourceInUseException ao excluir cliente com OS vinculadas")
     void deveLancarResourceInUseExceptionAoExcluirClienteComOSVinculadas() {
         Cliente clienteExistente = new Cliente(1L, "Robert", "12345678909", "robert@email.com", "11999999999");
-        OrdemServico os = new OrdemServico(1L, 1L, 1L, null, null, null, null, "obs", null, null, null, null, null);
+        OrdemServico os = new OrdemServico(1L, 1L, 1L, null, null, null, null, "obs", null, null, null, null, null, null, null, null);
         when(repositoryPort.buscarPorId(1L)).thenReturn(Optional.of(clienteExistente));
         when(osRepositoryPort.buscarPorClienteId(1L)).thenReturn(List.of(os));
 

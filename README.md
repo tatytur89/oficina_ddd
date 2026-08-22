@@ -314,8 +314,12 @@ Base: `/api/v1/ordens-servico`
 | GET | `/api/v1/ordens-servico/periodo?inicio={data}&fim={data}` | Listar OS abertas num período |
 | PATCH | `/api/v1/ordens-servico/{id}/orcamento` | Enviar orçamento para aprovação |
 | PATCH | `/api/v1/ordens-servico/{id}/status/{status}` | Atualizar status da OS |
-| GET | `/api/v1/ordens-servico/{id}/acompanhar` | Acompanhar progresso da OS (público, sem autenticação) |
+| POST | `/api/v1/ordens-servico/{id}/diagnostico` | Registrar o diagnóstico completo (transiciona para `EM_DIAGNOSTICO` + adiciona serviços/peças numa só chamada) |
+| POST | `/api/v1/ordens-servico/{id}/servicos` | Adicionar um serviço à OS (exige `EM_DIAGNOSTICO`) |
+| POST | `/api/v1/ordens-servico/{id}/pecas` | Adicionar uma peça à OS (exige `EM_DIAGNOSTICO`) |
 | GET | `/api/v1/ordens-servico/metricas/tempo-medio-execucao` | Tempo médio de execução das OS finalizadas |
+
+A resposta autenticada da OS (criar, listar, buscar por ID) inclui o campo `chaveAcesso` — é essa chave que a equipe administrativa repassa ao cliente (não há integração de e-mail/SMS no projeto) para ele acessar a página pública de acompanhamento descrita abaixo.
 
 Exemplo de corpo (criar OS):
 
@@ -323,15 +327,30 @@ Exemplo de corpo (criar OS):
 {
   "clienteId": 1,
   "veiculoId": 1,
-  "dataPrevistaEntrega": "2026-08-30T18:00:00",
-  "observacoes": "Ruído no freio dianteiro",
-  "servicos": [
-    { "servicoId": 1, "quantidade": 1 }
-  ],
-  "pecas": [
-    { "pecaId": 1, "quantidade": 1 }
-  ]
+  "observacoes": "Ruído no freio dianteiro"
 }
+```
+
+A OS nasce em `RECEBIDA` só com a observação do problema relatado — sem serviços/peças nem previsão de entrega ainda, já que essas informações só fazem sentido depois do diagnóstico (não dá pra estimar prazo antes de saber o que precisa ser feito). Depois, o diagnóstico pode ser registrado de duas formas:
+
+```json
+// POST /api/v1/ordens-servico/{id}/diagnostico
+// Transiciona para EM_DIAGNOSTICO, registra os itens e a previsão de entrega numa chamada só
+{
+  "servicos": [{ "servicoId": 1, "quantidade": 1 }],
+  "pecas": [{ "pecaId": 1, "quantidade": 1 }],
+  "dataPrevistaEntrega": "2026-08-30T18:00:00"
+}
+```
+
+Ou, se preferir ajustar item a item (a OS já precisa estar em `EM_DIAGNOSTICO`, via `PATCH /{id}/status/EM_DIAGNOSTICO` ou pelo endpoint acima com listas vazias):
+
+```json
+// POST /api/v1/ordens-servico/{id}/servicos
+{ "servicoId": 1, "quantidade": 1 }
+
+// POST /api/v1/ordens-servico/{id}/pecas
+{ "pecaId": 1, "quantidade": 1 }
 ```
 
 ### Máquina de estados da OS
@@ -340,10 +359,25 @@ Exemplo de corpo (criar OS):
 RECEBIDA → EM_DIAGNOSTICO → AGUARDANDO_APROVACAO → EM_EXECUCAO → FINALIZADA → ENTREGUE
 ```
 
-- Serviços e peças só podem ser adicionados à OS em `RECEBIDA` ou `EM_DIAGNOSTICO`.
+- Serviços e peças só podem ser adicionados à OS em `EM_DIAGNOSTICO`.
 - `enviarOrcamento` exige a OS em `EM_DIAGNOSTICO` e pelo menos um serviço vinculado.
 - Ao transicionar para `EM_EXECUCAO`, o estoque de cada peça vinculada é baixado automaticamente.
 - Não há caminho de cancelamento — cada status só avança para o próximo da lista.
+
+## Página de acompanhamento, aprovação e avaliação (cliente)
+
+Como o cliente não tem login no sistema, o acompanhamento da OS, a aprovação do orçamento e a avaliação do serviço acontecem por uma página HTML pública, protegida pela `chaveAcesso` gerada para aquela OS específica (não é um endpoint de API JSON):
+
+```text
+GET  http://localhost:8080/acompanhamento/{id}?chave={chaveAcesso}
+```
+
+- Mostra o status atual, datas, serviços/peças vinculados e o valor total.
+- Se o status for `AGUARDANDO_APROVACAO`, a página exibe um botão **"Aprovar orçamento"**, que envia `POST /acompanhamento/{id}/aprovar` e transiciona a OS para `EM_EXECUCAO`.
+- Quando `FINALIZADA`, a página avisa que o veículo está pronto para retirada.
+- Quando `ENTREGUE` e ainda não avaliada, a página exibe um formulário de avaliação (nota de 1 a 5 + comentário opcional), enviado via `POST /acompanhamento/{id}/avaliar`. Depois de avaliada, a página passa a mostrar a nota e o comentário registrados.
+- A `chaveAcesso` **não expira** — permanece válida durante toda a vida da OS, inclusive depois da entrega, já que também é usada para a avaliação.
+- Chave incorreta ou OS inexistente resultam numa página de erro (`400`/`404`), sem revelar dados da OS de outros clientes.
 
 ## Coleção Postman
 

@@ -238,7 +238,7 @@ class VeiculoServiceTest {
     @DisplayName("Deve lançar ResourceInUseException ao excluir veículo com OS vinculadas")
     void deveLancarResourceInUseExceptionAoExcluirVeiculoComOSVinculadas() {
         Veiculo veiculoExistente = new Veiculo(1L, "Toyota", "Corolla", 2022, "ABC1D23", 1L);
-        OrdemServico os = new OrdemServico(1L, 1L, 1L, null, null, null, null, "obs", null, null, null, null, null);
+        OrdemServico os = new OrdemServico(1L, 1L, 1L, null, null, null, null, "obs", null, null, null, null, null, null, null, null);
         when(repositoryPort.buscarPorId(1L)).thenReturn(Optional.of(veiculoExistente));
         when(osRepositoryPort.buscarPorVeiculoId(1L)).thenReturn(List.of(os));
 
