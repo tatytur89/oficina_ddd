@@ -143,6 +143,27 @@ class OrdemServicoServiceTest {
     }
 
     @Test
+    @DisplayName("Deve listar OS por cliente")
+    void deveListarPorCliente() {
+        OrdemServico os = new OrdemServico(1L, 1L, 1L, StatusOS.RECEBIDA, null, null, null, "obs", new Preco(BigDecimal.ZERO), new Preco(BigDecimal.ZERO), new Preco(BigDecimal.ZERO), null, null);
+        when(clienteRepositoryPort.buscarPorId(1L)).thenReturn(Optional.of(CLIENTE));
+        when(osRepositoryPort.buscarPorClienteId(1L)).thenReturn(List.of(os));
+
+        List<OrdemServico> resultado = ordemServicoService.listarPorCliente(1L);
+
+        assertEquals(1, resultado.size());
+    }
+
+    @Test
+    @DisplayName("Deve lançar ResourceNotFoundException ao listar OS de cliente inexistente")
+    void deveLancarResourceNotFoundExceptionAoListarPorClienteInexistente() {
+        when(clienteRepositoryPort.buscarPorId(1L)).thenReturn(Optional.empty());
+
+        assertThrows(ResourceNotFoundException.class, () -> ordemServicoService.listarPorCliente(1L));
+        verify(osRepositoryPort, never()).buscarPorClienteId(any());
+    }
+
+    @Test
     @DisplayName("Deve buscar OS por ID com sucesso")
     void deveBuscarPorId() {
         OrdemServico os = new OrdemServico(1L, 1L, 1L, StatusOS.RECEBIDA, null, null, null, "obs", new Preco(BigDecimal.ZERO), new Preco(BigDecimal.ZERO), new Preco(BigDecimal.ZERO), null, null);

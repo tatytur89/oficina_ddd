@@ -12,6 +12,7 @@ public interface OrdemServicoRepositoryPort {
     Optional<OrdemServico> buscarPorId(Long id);
     List<OrdemServico> buscarTodas();
     List<OrdemServico> buscarPorClienteId(Long clienteId);
+    List<OrdemServico> buscarPorVeiculoId(Long veiculoId);
     List<OrdemServico> buscarPorStatus(StatusOS status);
     List<OrdemServico> buscarPorPeriodo(LocalDateTime inicio, LocalDateTime fim);
 }

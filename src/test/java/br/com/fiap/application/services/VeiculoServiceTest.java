@@ -8,10 +8,13 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import br.com.fiap.application.exceptions.ResourceAlreadyExistsException;
+import br.com.fiap.application.exceptions.ResourceInUseException;
 import br.com.fiap.application.exceptions.ResourceNotFoundException;
 import br.com.fiap.domain.entities.Cliente;
+import br.com.fiap.domain.entities.OrdemServico;
 import br.com.fiap.domain.entities.Veiculo;
 import br.com.fiap.ports.out.ClienteRepositoryPort;
+import br.com.fiap.ports.out.OrdemServicoRepositoryPort;
 import br.com.fiap.ports.out.VeiculoRepositoryPort;
 
 import java.util.List;
@@ -29,6 +32,9 @@ class VeiculoServiceTest {
 
     @Mock
     private ClienteRepositoryPort clienteRepositoryPort;
+
+    @Mock
+    private OrdemServicoRepositoryPort osRepositoryPort;
 
     @InjectMocks
     private VeiculoService veiculoService;
@@ -92,11 +98,21 @@ class VeiculoServiceTest {
     @DisplayName("Deve listar veículos por cliente")
     void deveListarPorCliente() {
         Veiculo veiculo = new Veiculo(1L, "Toyota", "Corolla", 2022, "ABC1D23", 1L);
+        when(clienteRepositoryPort.buscarPorId(1L)).thenReturn(Optional.of(CLIENTE));
         when(repositoryPort.buscarPorClienteId(1L)).thenReturn(List.of(veiculo));
 
         List<Veiculo> resultado = veiculoService.listarPorCliente(1L);
 
         assertEquals(1, resultado.size());
+    }
+
+    @Test
+    @DisplayName("Deve lançar ResourceNotFoundException ao listar veículos de cliente inexistente")
+    void deveLancarResourceNotFoundExceptionAoListarPorClienteInexistente() {
+        when(clienteRepositoryPort.buscarPorId(1L)).thenReturn(Optional.empty());
+
+        assertThrows(ResourceNotFoundException.class, () -> veiculoService.listarPorCliente(1L));
+        verify(repositoryPort, never()).buscarPorClienteId(any());
     }
 
     @Test
@@ -216,5 +232,17 @@ class VeiculoServiceTest {
     void deveLancarIllegalArgumentExceptionAoExcluirSemId() {
         assertThrows(IllegalArgumentException.class, () -> veiculoService.excluirVeiculo(null));
         verify(repositoryPort, never()).buscarPorId(any());
+    }
+
+    @Test
+    @DisplayName("Deve lançar ResourceInUseException ao excluir veículo com OS vinculadas")
+    void deveLancarResourceInUseExceptionAoExcluirVeiculoComOSVinculadas() {
+        Veiculo veiculoExistente = new Veiculo(1L, "Toyota", "Corolla", 2022, "ABC1D23", 1L);
+        OrdemServico os = new OrdemServico(1L, 1L, 1L, null, null, null, null, "obs", null, null, null, null, null);
+        when(repositoryPort.buscarPorId(1L)).thenReturn(Optional.of(veiculoExistente));
+        when(osRepositoryPort.buscarPorVeiculoId(1L)).thenReturn(List.of(os));
+
+        assertThrows(ResourceInUseException.class, () -> veiculoService.excluirVeiculo(1L));
+        verify(repositoryPort, never()).excluirPorId(any());
     }
 }

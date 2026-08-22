@@ -64,22 +64,7 @@ public class AuthController {
         ),
         @ApiResponse(
             responseCode = "403",
-            description = "Credenciais inválidas",
-            content = @Content(
-                mediaType = "application/json",
-                schema = @Schema(implementation = ApiErrorResponse.class),
-                examples = @ExampleObject(
-                    value = """
-                        {
-                            "timestamp": "2026-08-12T10:30:00",
-                            "status": 403,
-                            "error": "Forbidden",
-                            "message": "Credenciais inválidas",
-                            "path": "/api/v1/auth/login"
-                        }
-                        """
-                )
-            )
+            description = "Credenciais inválidas (corpo vazio)"
         )
     })
     @PostMapping("/login")

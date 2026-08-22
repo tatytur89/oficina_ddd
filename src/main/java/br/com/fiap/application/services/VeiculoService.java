@@ -6,10 +6,12 @@ import java.util.Optional;
 import org.springframework.stereotype.Service;
 
 import br.com.fiap.application.exceptions.ResourceAlreadyExistsException;
+import br.com.fiap.application.exceptions.ResourceInUseException;
 import br.com.fiap.application.exceptions.ResourceNotFoundException;
 import br.com.fiap.domain.entities.Veiculo;
 import br.com.fiap.ports.in.VeiculoUseCase;
 import br.com.fiap.ports.out.ClienteRepositoryPort;
+import br.com.fiap.ports.out.OrdemServicoRepositoryPort;
 import br.com.fiap.ports.out.VeiculoRepositoryPort;
 
 @Service
@@ -17,10 +19,12 @@ public class VeiculoService implements VeiculoUseCase {
 
     private final VeiculoRepositoryPort veiculoRepositoryPort;
     private final ClienteRepositoryPort clienteRepositoryPort;
+    private final OrdemServicoRepositoryPort osRepositoryPort;
 
-    public VeiculoService(VeiculoRepositoryPort veiculoRepositoryPort, ClienteRepositoryPort clienteRepositoryPort) {
+    public VeiculoService(VeiculoRepositoryPort veiculoRepositoryPort, ClienteRepositoryPort clienteRepositoryPort, OrdemServicoRepositoryPort osRepositoryPort) {
         this.veiculoRepositoryPort = veiculoRepositoryPort;
         this.clienteRepositoryPort = clienteRepositoryPort;
+        this.osRepositoryPort = osRepositoryPort;
     }
 
     @Override
@@ -42,6 +46,9 @@ public class VeiculoService implements VeiculoUseCase {
 
     @Override
     public List<Veiculo> listarPorCliente(Long clienteId) {
+        clienteRepositoryPort.buscarPorId(clienteId)
+                .orElseThrow(() -> new ResourceNotFoundException("Cliente não encontrado com ID: " + clienteId));
+
         return veiculoRepositoryPort.buscarPorClienteId(clienteId);
     }
 
@@ -93,6 +100,10 @@ public class VeiculoService implements VeiculoUseCase {
 
         veiculoRepositoryPort.buscarPorId(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Veículo não encontrado com ID: " + id));
+
+        if (!osRepositoryPort.buscarPorVeiculoId(id).isEmpty()) {
+            throw new ResourceInUseException("Veículo possui ordens de serviço vinculadas e não pode ser excluído.");
+        }
 
         veiculoRepositoryPort.excluirPorId(id);
     }

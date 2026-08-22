@@ -10,6 +10,7 @@ import org.springframework.data.repository.query.Param;
 
 public interface OrdemServicoJpaRepository extends JpaRepository<OrdemServicoJpaEntity, Long> {
     List<OrdemServicoJpaEntity> findByClienteId(Long clienteId);
+    List<OrdemServicoJpaEntity> findByVeiculoId(Long veiculoId);
     List<OrdemServicoJpaEntity> findByStatus(String status);
     
     @Query("SELECT os FROM OrdemServicoJpaEntity os WHERE os.dataAbertura BETWEEN :inicio AND :fim")

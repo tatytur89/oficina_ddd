@@ -8,9 +8,14 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import br.com.fiap.application.exceptions.ResourceAlreadyExistsException;
+import br.com.fiap.application.exceptions.ResourceInUseException;
 import br.com.fiap.application.exceptions.ResourceNotFoundException;
 import br.com.fiap.domain.entities.Cliente;
+import br.com.fiap.domain.entities.OrdemServico;
+import br.com.fiap.domain.entities.Veiculo;
 import br.com.fiap.ports.out.ClienteRepositoryPort;
+import br.com.fiap.ports.out.OrdemServicoRepositoryPort;
+import br.com.fiap.ports.out.VeiculoRepositoryPort;
 
 import java.util.List;
 import java.util.Optional;
@@ -24,6 +29,12 @@ class ClienteServiceTest {
 
     @Mock
     private ClienteRepositoryPort repositoryPort;
+
+    @Mock
+    private VeiculoRepositoryPort veiculoRepositoryPort;
+
+    @Mock
+    private OrdemServicoRepositoryPort osRepositoryPort;
 
     @InjectMocks
     private ClienteService clienteService;
@@ -178,5 +189,29 @@ class ClienteServiceTest {
     void deveLancarIllegalArgumentExceptionAoExcluirSemId() {
         assertThrows(IllegalArgumentException.class, () -> clienteService.excluirCliente(null));
         verify(repositoryPort, never()).buscarPorId(any());
+    }
+
+    @Test
+    @DisplayName("Deve lançar ResourceInUseException ao excluir cliente com veículos vinculados")
+    void deveLancarResourceInUseExceptionAoExcluirClienteComVeiculosVinculados() {
+        Cliente clienteExistente = new Cliente(1L, "Robert", "12345678909", "robert@email.com", "11999999999");
+        Veiculo veiculo = new Veiculo(1L, "Toyota", "Corolla", 2022, "ABC1D23", 1L);
+        when(repositoryPort.buscarPorId(1L)).thenReturn(Optional.of(clienteExistente));
+        when(veiculoRepositoryPort.buscarPorClienteId(1L)).thenReturn(List.of(veiculo));
+
+        assertThrows(ResourceInUseException.class, () -> clienteService.excluirCliente(1L));
+        verify(repositoryPort, never()).excluirPorId(any());
+    }
+
+    @Test
+    @DisplayName("Deve lançar ResourceInUseException ao excluir cliente com OS vinculadas")
+    void deveLancarResourceInUseExceptionAoExcluirClienteComOSVinculadas() {
+        Cliente clienteExistente = new Cliente(1L, "Robert", "12345678909", "robert@email.com", "11999999999");
+        OrdemServico os = new OrdemServico(1L, 1L, 1L, null, null, null, null, "obs", null, null, null, null, null);
+        when(repositoryPort.buscarPorId(1L)).thenReturn(Optional.of(clienteExistente));
+        when(osRepositoryPort.buscarPorClienteId(1L)).thenReturn(List.of(os));
+
+        assertThrows(ResourceInUseException.class, () -> clienteService.excluirCliente(1L));
+        verify(repositoryPort, never()).excluirPorId(any());
     }
 }

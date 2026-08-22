@@ -78,18 +78,22 @@ public class OrdemServicoController {
                             "dataAbertura": "2026-08-12T10:30:00",
                             "dataPrevistaEntrega": "2026-08-20T18:00:00",
                             "observacoes": "Cliente relata barulho no freio",
-                            "valorServicos": 250.00,
-                            "valorPecas": 91.80,
-                            "valorTotal": 341.80,
-                            "servicos": [],
-                            "pecas": []
+                            "valorServicos": 150.00,
+                            "valorPecas": 45.90,
+                            "valorTotal": 195.90,
+                            "servicos": [
+                                {"servicoId": 1, "nomeServico": "Troca de Óleo", "quantidade": 1, "precoUnitario": 150.00, "valorTotal": 150.00}
+                            ],
+                            "pecas": [
+                                {"pecaId": 1, "nomePeca": "Filtro de Óleo", "codigoPeca": "FIL001", "quantidade": 1, "precoUnitario": 45.90, "valorTotal": 45.90}
+                            ]
                         }
                     }
                     """
             ))
         ),
         @ApiResponse(responseCode = "400", description = "Dados inválidos", content = @Content(
-            examples = @ExampleObject(value = "{\"status\": \"error\", \"message\": \"O ID do cliente é obrigatório\", \"dados\": null}"))),
+            examples = @ExampleObject(value = "{\"status\": \"error\", \"message\": \"clienteId: O ID do cliente é obrigatório\", \"dados\": null}"))),
         @ApiResponse(responseCode = "404", description = "Cliente, veículo, serviço ou peça informado não encontrado", content = @Content(
             examples = @ExampleObject(value = "{\"status\": \"error\", \"message\": \"Cliente não encontrado com ID: 1\", \"dados\": null}")))
     })
@@ -151,7 +155,9 @@ public class OrdemServicoController {
         description = "Retorna todas as OS de um cliente específico, ordenadas por data de abertura."
     )
     @ApiResponses(value = {
-        @ApiResponse(responseCode = "200", description = "Lista de OS do cliente retornada com sucesso")
+        @ApiResponse(responseCode = "200", description = "Lista de OS do cliente retornada com sucesso"),
+        @ApiResponse(responseCode = "404", description = "Cliente não encontrado", content = @Content(
+            examples = @ExampleObject(value = "{\"status\": \"error\", \"message\": \"Cliente não encontrado com ID: 1\", \"dados\": null}")))
     })
     @GetMapping("/cliente/{clienteId}")
     public ResponseEntity<Response<List<OrdemServicoResponse>>> listarPorCliente(
@@ -230,7 +236,20 @@ public class OrdemServicoController {
             """
     )
     @ApiResponses(value = {
-        @ApiResponse(responseCode = "200", description = "Orçamento enviado com sucesso"),
+        @ApiResponse(responseCode = "200", description = "Orçamento enviado com sucesso", content = @Content(
+            examples = @ExampleObject(value = """
+                {
+                    "status": "success",
+                    "message": "Orçamento enviado com sucesso",
+                    "dados": {
+                        "id": 1,
+                        "status": "AGUARDANDO_APROVACAO",
+                        "valorServicos": 250.00,
+                        "valorPecas": 91.80,
+                        "valorTotal": 341.80
+                    }
+                }
+                """))),
         @ApiResponse(responseCode = "400", description = "Transição de status inválida", content = @Content(
             examples = @ExampleObject(value = "{\"status\": \"error\", \"message\": \"A OS deve estar Em Andamento para enviar orçamento.\", \"dados\": null}"))),
         @ApiResponse(responseCode = "404", description = "OS não encontrada", content = @Content(
@@ -295,7 +314,20 @@ public class OrdemServicoController {
             """
     )
     @ApiResponses(value = {
-        @ApiResponse(responseCode = "200", description = "Progresso retornado com sucesso"),
+        @ApiResponse(responseCode = "200", description = "Progresso retornado com sucesso", content = @Content(
+            examples = @ExampleObject(value = """
+                {
+                    "status": "success",
+                    "message": "Progresso retornado com sucesso",
+                    "dados": {
+                        "id": 1,
+                        "status": "EM_EXECUCAO",
+                        "dataAbertura": "2026-08-12T10:30:00",
+                        "dataPrevistaEntrega": "2026-08-20T18:00:00",
+                        "valorTotal": 341.80
+                    }
+                }
+                """))),
         @ApiResponse(responseCode = "404", description = "OS não encontrada", content = @Content(
             examples = @ExampleObject(value = "{\"status\": \"error\", \"message\": \"OS não encontrada com ID: 1\", \"dados\": null}")))
     })

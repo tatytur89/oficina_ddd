@@ -10,6 +10,7 @@ import org.springframework.web.context.request.WebRequest;
 
 import br.com.fiap.adapters.in.web.DTO.Dados.Response;
 import br.com.fiap.application.exceptions.ResourceAlreadyExistsException;
+import br.com.fiap.application.exceptions.ResourceInUseException;
 import br.com.fiap.application.exceptions.ResourceNotFoundException;
 
 @ControllerAdvice
@@ -86,6 +87,19 @@ public class GlobalExceptionHandler {
         );
 
         return ResponseEntity.status(HttpStatus.NOT_FOUND).body(resposta);
+
+    }
+
+    @ExceptionHandler(ResourceInUseException.class)
+    public ResponseEntity<Response<Void>> handleResourceInUse(ResourceInUseException ex, WebRequest request) {
+
+        Response<Void> resposta = new Response<>(
+                "error",
+                ex.getMessage(),
+                null
+        );
+
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(resposta);
 
     }
 

@@ -102,6 +102,9 @@ public class OrdemServicoService implements OrdemServicoUseCase {
 
     @Override
     public List<OrdemServico> listarPorCliente(Long clienteId) {
+        clienteRepositoryPort.buscarPorId(clienteId)
+                .orElseThrow(() -> new ResourceNotFoundException("Cliente não encontrado com ID: " + clienteId));
+
         return osRepositoryPort.buscarPorClienteId(clienteId);
     }
 

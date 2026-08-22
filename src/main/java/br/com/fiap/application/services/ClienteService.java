@@ -6,18 +6,25 @@ import java.util.Optional;
 import org.springframework.stereotype.Service;
 
 import br.com.fiap.application.exceptions.ResourceAlreadyExistsException;
+import br.com.fiap.application.exceptions.ResourceInUseException;
 import br.com.fiap.application.exceptions.ResourceNotFoundException;
 import br.com.fiap.domain.entities.Cliente;
 import br.com.fiap.ports.in.ClienteUseCase;
 import br.com.fiap.ports.out.ClienteRepositoryPort;
+import br.com.fiap.ports.out.OrdemServicoRepositoryPort;
+import br.com.fiap.ports.out.VeiculoRepositoryPort;
 
 @Service
 public class ClienteService implements ClienteUseCase {
 
     private final ClienteRepositoryPort clienteRepositoryPort;
+    private final VeiculoRepositoryPort veiculoRepositoryPort;
+    private final OrdemServicoRepositoryPort osRepositoryPort;
 
-    public ClienteService(ClienteRepositoryPort clienteRepositoryPort) {
+    public ClienteService(ClienteRepositoryPort clienteRepositoryPort, VeiculoRepositoryPort veiculoRepositoryPort, OrdemServicoRepositoryPort osRepositoryPort) {
         this.clienteRepositoryPort = clienteRepositoryPort;
+        this.veiculoRepositoryPort = veiculoRepositoryPort;
+        this.osRepositoryPort = osRepositoryPort;
     }
 
     @Override
@@ -77,9 +84,17 @@ public class ClienteService implements ClienteUseCase {
 	public void excluirCliente(Long id) {
 		
 		if(id == null) throw new IllegalArgumentException("O ID do cliente é obrigatório");
-		
+
 		clienteRepositoryPort.buscarPorId(id).orElseThrow(() ->
         						new ResourceNotFoundException("Cliente não encontrado com ID: " + id));
+
+		if (!veiculoRepositoryPort.buscarPorClienteId(id).isEmpty()) {
+			throw new ResourceInUseException("Cliente possui veículos vinculados e não pode ser excluído.");
+		}
+
+		if (!osRepositoryPort.buscarPorClienteId(id).isEmpty()) {
+			throw new ResourceInUseException("Cliente possui ordens de serviço vinculadas e não pode ser excluído.");
+		}
 
 		 clienteRepositoryPort.excluirPorId(id);
 		

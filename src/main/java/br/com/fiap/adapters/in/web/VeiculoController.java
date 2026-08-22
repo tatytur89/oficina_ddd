@@ -132,7 +132,9 @@ public class VeiculoController {
         description = "Retorna todos os veículos vinculados a um cliente específico."
     )
     @ApiResponses(value = {
-        @ApiResponse(responseCode = "200", description = "Lista de veículos do cliente retornada com sucesso")
+        @ApiResponse(responseCode = "200", description = "Lista de veículos do cliente retornada com sucesso"),
+        @ApiResponse(responseCode = "404", description = "Cliente não encontrado", content = @Content(
+            examples = @ExampleObject(value = "{\"status\": \"error\", \"message\": \"Cliente não encontrado com ID: 1\", \"dados\": null}")))
     })
     @GetMapping("/cliente/{clienteId}")
     public ResponseEntity<Response<List<VeiculoResponse>>> listarPorCliente(
@@ -202,7 +204,9 @@ public class VeiculoController {
     @ApiResponses(value = {
         @ApiResponse(responseCode = "200", description = "Veículo excluído com sucesso"),
         @ApiResponse(responseCode = "404", description = "Veículo não encontrado", content = @Content(
-            examples = @ExampleObject(value = "{\"status\": \"error\", \"message\": \"Veículo não encontrado com ID: 1\", \"dados\": null}")))
+            examples = @ExampleObject(value = "{\"status\": \"error\", \"message\": \"Veículo não encontrado com ID: 1\", \"dados\": null}"))),
+        @ApiResponse(responseCode = "409", description = "Veículo possui ordens de serviço vinculadas", content = @Content(
+            examples = @ExampleObject(value = "{\"status\": \"error\", \"message\": \"Veículo possui ordens de serviço vinculadas e não pode ser excluído.\", \"dados\": null}")))
     })
     @DeleteMapping("/{id}")
     public ResponseEntity<Response<Void>> excluir(

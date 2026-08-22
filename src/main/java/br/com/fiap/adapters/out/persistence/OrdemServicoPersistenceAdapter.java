@@ -82,6 +82,13 @@ public class OrdemServicoPersistenceAdapter implements OrdemServicoRepositoryPor
     }
 
     @Override
+    public List<OrdemServico> buscarPorVeiculoId(Long veiculoId) {
+        return jpaRepository.findByVeiculoId(veiculoId).stream()
+                .map(this::mapearParaDominio)
+                .toList();
+    }
+
+    @Override
     public List<OrdemServico> buscarPorStatus(StatusOS status) {
         return jpaRepository.findByStatus(status.name()).stream()
                 .map(this::mapearParaDominio)

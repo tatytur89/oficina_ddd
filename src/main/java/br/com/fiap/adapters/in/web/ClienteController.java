@@ -82,6 +82,8 @@ public class ClienteController {
     @Operation(summary = "Buscar cliente por CPF/CNPJ")
     @ApiResponses(value = {
         @ApiResponse(responseCode = "200", description = "Cliente encontrado com sucesso"),
+        @ApiResponse(responseCode = "400", description = "Documento não informado", content = @Content(
+            examples = @ExampleObject(value = "{\"status\": \"error\", \"message\": \"O documento para busca não pode ser nulo ou vazio\", \"dados\": null}"))),
         @ApiResponse(responseCode = "404", description = "Cliente não encontrado", content = @Content(
             examples = @ExampleObject(value = "{\"status\": \"error\", \"message\": \"Cliente não encontrado\", \"dados\": null}")))
     })
@@ -124,7 +126,9 @@ public class ClienteController {
     @ApiResponses(value = {
         @ApiResponse(responseCode = "200", description = "Cliente excluído com sucesso"),
         @ApiResponse(responseCode = "404", description = "Cliente não encontrado", content = @Content(
-            examples = @ExampleObject(value = "{\"status\": \"error\", \"message\": \"Cliente não encontrado com ID: 1\", \"dados\": null}")))
+            examples = @ExampleObject(value = "{\"status\": \"error\", \"message\": \"Cliente não encontrado com ID: 1\", \"dados\": null}"))),
+        @ApiResponse(responseCode = "409", description = "Cliente possui veículos ou ordens de serviço vinculados", content = @Content(
+            examples = @ExampleObject(value = "{\"status\": \"error\", \"message\": \"Cliente possui veículos vinculados e não pode ser excluído.\", \"dados\": null}")))
     })
     @DeleteMapping("/{id}")
     public ResponseEntity<Response<Void>> excluirCliente(
