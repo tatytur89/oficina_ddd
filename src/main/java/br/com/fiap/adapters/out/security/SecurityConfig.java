@@ -37,6 +37,8 @@ private final SecurityFilter securityFilter;
                         "/swagger-ui/index.html/**",
                         "/webjars/**"
                     ).permitAll();
+
+                    req.requestMatchers("/actuator/health", "/actuator/health/**").permitAll();
                     
                     // Libera a rota de autenticação/login
                     req.requestMatchers(HttpMethod.POST, "/api/v1/auth/login").permitAll();
