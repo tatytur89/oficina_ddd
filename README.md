@@ -105,6 +105,76 @@ A aplicação estará disponível em:
 http://localhost:8089
 ```
 
+## Deploy no Kubernetes
+
+Os manifests em `k8s/` publicam a API usando um PostgreSQL externo. Para deploy automatizado, cada push em `main` que conclui o CI com sucesso dispara o workflow **CD Pipeline**, que publica a imagem com a tag `sha-<commit>` no GHCR e atualiza o Deployment. Configure o secret `KUBE_CONFIG` nas configurações do repositório com o conteúdo do kubeconfig. A imagem do GHCR precisa ser pública para que o cluster possa baixá-la.
+
+Antes do primeiro deploy automatizado, crie o namespace `oficina-api` e o Secret `oficina-api-secret` no cluster. O workflow verifica se esse Secret existe e não aplica `secret.yaml.example`, que contém apenas valores placeholder.
+
+Para aplicar os manifests manualmente:
+
+1. Publique a imagem pelo workflow **Build and Push Docker Image** em Actions e anote uma tag existente no GHCR (por exemplo, `sha-<sha-curto>`). Atualize `image` em `k8s/deployment.yaml` com essa tag.
+2. Ajuste o host e, se necessário, `ingressClassName` em `k8s/ingress.yaml`. O cluster precisa ter um controlador Ingress instalado e DNS apontando para ele.
+3. Copie `k8s/secret.yaml.example` para `k8s/secret.yaml` e substitua todos os valores `REPLACE_WITH_...` pela URL JDBC e credenciais do banco externo, segredo JWT aleatório (mínimo de 32 bytes) e credenciais do administrador. O arquivo `k8s/secret.yaml` é ignorado pelo Git; não versione segredos reais. O exemplo não deve ser aplicado sem edição.
+4. Crie o namespace (uma vez) e aplique os recursos:
+
+```bash
+kubectl create namespace oficina-api
+kubectl apply -n oficina-api -f k8s/
+kubectl rollout status -n oficina-api deployment/oficina-api
+```
+
+No PowerShell, use `Copy-Item k8s\secret.yaml.example k8s\secret.yaml` para copiar o exemplo. Se o pacote GHCR for privado, crie um `imagePullSecret` no namespace e referencie-o em `spec.template.spec.imagePullSecrets` no Deployment. O Ingress de exemplo não configura TLS; em produção, configure `spec.tls` com um certificado apropriado.
+
+O Deployment e o Service usam a porta 8080 (a porta interna real da aplicação). As probes usam os endpoints de liveness/readiness do Actuator, liberados sem autenticação para uso pelo Kubernetes; a readiness também considera a conexão ao banco. O `ConfigMap` guarda apenas configurações não sensíveis; credenciais ficam no `Secret`. Os valores de `resources` são uma base inicial e devem ser ajustados conforme o consumo observado no cluster.
+
+O perfil `docker` está configurado com `spring.jpa.hibernate.ddl-auto=validate`: prepare previamente o schema do banco externo para corresponder à aplicação. Esses manifests não criam tabelas nem executam migrações.
+
+## Infraestrutura AWS com Terraform
+
+A configuração em `terraform/` cria uma VPC em duas zonas, EKS com nós privados, PostgreSQL RDS privado e criptografado com senha gerenciada pelo Secrets Manager, regras de rede e a role IAM do AWS Load Balancer Controller. O controller é instalado por uma segunda configuração Terraform em `terraform/addons/`, depois que o cluster já existe; isso evita inicializar o provider Kubernetes antes do EKS estar disponível.
+
+Você precisa de Terraform 1.5+, AWS CLI, `kubectl`, Helm 3 e credenciais AWS com permissões para criar EKS, VPC, RDS, IAM e Secrets Manager. Configure o perfil AWS e copie o exemplo de variáveis no PowerShell:
+
+```powershell
+Copy-Item terraform\terraform.tfvars.example terraform\terraform.tfvars
+```
+
+Edite `terraform/terraform.tfvars`, substituindo `REPLACE_WITH_YOUR_PUBLIC_IP/32` pelo seu IP público e escolhendo região/valores apropriados. O CIDR `0.0.0.0/0` é rejeitado para proteger o endpoint público do EKS. Em seguida:
+
+```powershell
+terraform -chdir=terraform init
+terraform -chdir=terraform plan
+terraform -chdir=terraform apply
+$region = terraform -chdir=terraform output -raw aws_region
+$cluster = terraform -chdir=terraform output -raw cluster_name
+aws eks update-kubeconfig --region $region --name $cluster
+terraform -chdir=terraform/addons init
+$vpc = terraform -chdir=terraform output -raw vpc_id
+$controllerRole = terraform -chdir=terraform output -raw aws_load_balancer_controller_role_arn
+terraform -chdir=terraform/addons apply `
+  -var="aws_region=$region" `
+  -var="cluster_name=$cluster" `
+  -var="vpc_id=$vpc" `
+  -var="controller_role_arn=$controllerRole"
+kubectl create namespace oficina-api
+Copy-Item k8s\secret.yaml.example k8s\secret.yaml
+```
+
+Abra no AWS Secrets Manager o ARN exibido por `terraform -chdir=terraform output -raw database_master_secret_arn` e copie a senha gerenciada pelo RDS para `SPRING_DATASOURCE_PASSWORD` em `k8s/secret.yaml`. Preencha também `SPRING_DATASOURCE_URL` usando o endpoint de `terraform -chdir=terraform output -raw database_endpoint`, e defina valores fortes para `JWT_SECRET`, `ADMIN_USER` e `ADMIN_PASSWORD`. Depois aplique os manifests:
+
+```powershell
+kubectl apply -n oficina-api -f k8s\
+kubectl rollout status -n oficina-api deployment/oficina-api
+kubectl get ingress -n oficina-api oficina-api
+```
+
+Não coloque credenciais em `terraform.tfvars`, no Git ou na linha de comando. Se a imagem GHCR for privada, crie um `imagePullSecret` no namespace e referencie-o no Deployment.
+
+O RDS é criado sem tabelas. Como o perfil `docker` usa `spring.jpa.hibernate.ddl-auto=validate`, inicialize o schema por uma migração/script SQL aprovado antes de iniciar os pods; este repositório não inclui migrações de banco.
+
+Por padrão, a configuração usa nós `t3.medium`, RDS `db.t4g.micro`, um NAT Gateway e banco Single-AZ; esses recursos e o endpoint EKS geram cobrança contínua na AWS. A aplicação usa a senha mestra do RDS neste exemplo; para produção, crie um usuário PostgreSQL exclusivo com privilégios mínimos e use suas credenciais no Secret. O RDS tem proteção contra exclusão habilitada; para removê-lo intencionalmente, altere `database_deletion_protection` para `false`, aplique essa mudança e só então destrua a infraestrutura. Antes de destruir o cluster, remova o Ingress/ALB e o controller (`kubectl delete ingress -n oficina-api oficina-api` e `terraform -chdir=terraform/addons destroy`, informando os mesmos valores `-var` usados ao aplicar); o snapshot final do banco permanece na AWS e pode continuar gerando custo. O ALB é HTTP; configure certificado ACM e TLS antes de expor dados reais. O estado local do Terraform deve ser protegido e migrado para backend remoto criptografado/lock antes de uso por equipe ou produção.
+
 ## Interface Swagger
 
 A documentação interativa da API pode ser acessada em:

@@ -4,6 +4,14 @@ target/
 !**/src/main/**/target/
 !**/src/test/**/target/
 /.github/agents/
+k8s/secret.yaml
+terraform/.terraform/
+terraform/addons/.terraform/
+terraform/terraform.tfvars
+terraform/addons/terraform.tfvars
+*.tfstate
+*.tfstate.*
+*.tfplan
 
 ### STS ###
 .apt_generated
