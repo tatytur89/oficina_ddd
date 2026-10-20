@@ -107,7 +107,11 @@ http://localhost:8089
 
 ## Deploy no Kubernetes
 
-Os manifests em `k8s/` publicam a API usando um PostgreSQL externo. Antes de aplicar:
+Os manifests em `k8s/` publicam a API usando um PostgreSQL externo. Para deploy automatizado, cada push em `main` que conclui o CI com sucesso dispara o workflow **CD Pipeline**, que publica a imagem com a tag `sha-<commit>` no GHCR e atualiza o Deployment. Configure o secret `KUBE_CONFIG` nas configurações do repositório com o conteúdo do kubeconfig. A imagem do GHCR precisa ser pública para que o cluster possa baixá-la.
+
+Antes do primeiro deploy automatizado, crie o namespace `oficina-api` e o Secret `oficina-api-secret` no cluster. O workflow verifica se esse Secret existe e não aplica `secret.yaml.example`, que contém apenas valores placeholder.
+
+Para aplicar os manifests manualmente:
 
 1. Publique a imagem pelo workflow **Build and Push Docker Image** em Actions e anote uma tag existente no GHCR (por exemplo, `sha-<sha-curto>`). Atualize `image` em `k8s/deployment.yaml` com essa tag.
 2. Ajuste o host e, se necessário, `ingressClassName` em `k8s/ingress.yaml`. O cluster precisa ter um controlador Ingress instalado e DNS apontando para ele.
