@@ -214,9 +214,9 @@ class DecisaoOrcamentoIntegrationTest {
 
     @Test
     void rotasAdministrativasContinuamProtegidasSemToken() throws Exception {
-        mvc.perform(get("/api/v1/ordens-servico")).andExpect(status().is4xxClientError());
+        mvc.perform(get("/api/v1/ordens-servico")).andExpect(status().isForbidden());
         mvc.perform(post("/api/v1/ordens-servico").contentType(MediaType.APPLICATION_JSON)
-                .content("{\"clienteId\":1,\"veiculoId\":2}")).andExpect(status().is4xxClientError());
+                .content("{\"clienteId\":1,\"veiculoId\":2}")).andExpect(status().isForbidden());
     }
 
     @Test
