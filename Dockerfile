@@ -25,6 +25,10 @@ USER spring:spring
 
 ENV SPRING_PROFILES_ACTIVE=docker
 
+# Commit do Git que gerou a imagem, exposto em GET /api/v1/info
+ARG APP_COMMIT_SHA=local
+ENV APP_COMMIT_SHA=${APP_COMMIT_SHA}
+
 # Copia apenas o JAR gerado na etapa anterior
 COPY --from=builder /app/target/*.jar app.jar
 

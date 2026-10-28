@@ -39,6 +39,9 @@ private final SecurityFilter securityFilter;
                     ).permitAll();
 
                     req.requestMatchers("/actuator/health", "/actuator/health/**").permitAll();
+
+                    // Libera a consulta da versão em execução
+                    req.requestMatchers(HttpMethod.GET, "/api/v1/info").permitAll();
                     
                     // Libera a rota de autenticação/login
                     req.requestMatchers(HttpMethod.POST, "/api/v1/auth/login").permitAll();
