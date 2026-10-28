@@ -80,7 +80,8 @@ jobs:
           kubectl apply --namespace "$NAMESPACE" \
             -f k8s/configmap.yaml \
             -f k8s/service.yaml \
-            -f k8s/ingress.yaml
+            -f k8s/ingress.yaml \
+            -f k8s/hpa.yaml
 
       - name: Apply Deployment with tested image
         env:

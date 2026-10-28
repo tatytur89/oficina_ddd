@@ -5,7 +5,6 @@ metadata:
   labels:
     app.kubernetes.io/name: oficina-api
 spec:
-  replicas: 1
   selector:
     matchLabels:
       app.kubernetes.io/name: oficina-api
