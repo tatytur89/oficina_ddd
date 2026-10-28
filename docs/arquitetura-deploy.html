@@ -1,0 +1,178 @@
+<title>Arquitetura Oficina API</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+/* Layout: uma única prancha de arquitetura, legível em tela cheia para gravação */
+:root {
+  --bg: #f5f7f9; --fg: #16202b; --muted: #5a6676; --line: #b9c3cf; --surface: #ffffff;
+  --req: #0f766e; --ctrl: #b45309; --aws: #c2620a;
+  --band-pub: #e6f2ec; --band-priv: #e8eef9; --band-db: #f0eaf7; --zone: #eef1f5;
+  --sans: "IBM Plex Sans", system-ui, sans-serif; --mono: "IBM Plex Mono", ui-monospace, monospace;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #0e1319; --fg: #e5eaf0; --muted: #94a1b2; --line: #3a4757; --surface: #17202a;
+  --req: #2dd4bf; --ctrl: #f2a33a; --aws: #f08c2e;
+  --band-pub: #12241c; --band-priv: #131c2b; --band-db: #1d1727; --zone: #141b23; color-scheme: dark } }
+:root[data-theme="dark"] {
+  --bg: #0e1319; --fg: #e5eaf0; --muted: #94a1b2; --line: #3a4757; --surface: #17202a;
+  --req: #2dd4bf; --ctrl: #f2a33a; --aws: #f08c2e;
+  --band-pub: #12241c; --band-priv: #131c2b; --band-db: #1d1727; --zone: #141b23; color-scheme: dark }
+body { background: var(--bg); color: var(--fg); font-family: var(--sans); }
+main { max-width: 1320px; margin: 0 auto; padding-inline: 16px; padding-block: 28px 40px; display: grid; gap: 18px; }
+header { display: grid; gap: 4px; }
+h1 { font-size: 1.6rem; font-weight: 600; margin: 0; text-wrap: balance; }
+header p { margin: 0; color: var(--muted); font-size: .95rem; }
+.wrap { overflow-x: auto; }
+svg { display: block; width: 100%; min-width: 900px; height: auto; }
+svg text { font-family: var(--sans); fill: var(--fg); }
+.t { font-size: 15px; font-weight: 600; }
+.s { font-size: 12px; fill: var(--muted); }
+.m { font-family: var(--mono); font-size: 11.5px; fill: var(--muted); }
+.zl { font-size: 11px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; fill: var(--muted); }
+.box { fill: var(--surface); stroke: var(--line); stroke-width: 1.2; }
+.req { stroke: var(--req); stroke-width: 2.2; fill: none; }
+.ctrl { stroke: var(--ctrl); stroke-width: 1.8; fill: none; stroke-dasharray: 6 5; }
+.lr { fill: var(--req); font-size: 11.5px; font-weight: 500; }
+.lc { fill: var(--ctrl); font-size: 11.5px; font-weight: 500; }
+.legend { display: flex; flex-wrap: wrap; gap: 8px 28px; font-size: .9rem; color: var(--muted); }
+.legend span { display: inline-flex; align-items: center; gap: 8px; }
+.legend i { width: 30px; height: 0; border-top: 2.5px solid var(--req); }
+.legend i.c { border-top: 2px dashed var(--ctrl); }
+</style>
+
+<main>
+  <header>
+    <h1>Oficina Mecânica API na AWS</h1>
+    <p>Do commit na <code>main</code> até a requisição chegar ao PostgreSQL · região sa-east-1</p>
+  </header>
+
+  <div class="wrap">
+  <svg viewBox="0 0 1280 760" role="img" aria-label="Diagrama de arquitetura: pipeline GitHub Actions publica imagem no GHCR e faz rollout no EKS; usuário acessa via ALB, Ingress, Service e pod, que grava no RDS PostgreSQL.">
+    <defs>
+      <marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="var(--req)"/></marker>
+      <marker id="ac" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="var(--ctrl)"/></marker>
+    </defs>
+
+    <!-- Faixa de entrega -->
+    <rect x="12" y="90" width="250" height="640" rx="10" fill="var(--zone)" stroke="var(--line)"/>
+    <text x="28" y="114" class="zl">Entrega contínua</text>
+
+    <rect x="32" y="128" width="210" height="50" rx="8" class="box"/>
+    <text x="48" y="150" class="t">Desenvolvedor</text><text x="48" y="168" class="s">merge da PR na main</text>
+
+    <rect x="32" y="210" width="210" height="50" rx="8" class="box"/>
+    <text x="48" y="232" class="t">GitHub</text><text x="48" y="250" class="m">tatytur89/oficina_ddd</text>
+
+    <rect x="32" y="292" width="210" height="56" rx="8" class="box"/>
+    <text x="48" y="314" class="t">CI Pipeline</text><text x="48" y="334" class="s">mvnw verify · testes · OWASP</text>
+
+    <rect x="32" y="380" width="210" height="56" rx="8" class="box"/>
+    <text x="48" y="402" class="t">CD Pipeline</text><text x="48" y="422" class="s">build da imagem · rollout</text>
+
+    <rect x="32" y="480" width="210" height="56" rx="8" class="box"/>
+    <text x="48" y="502" class="t">GHCR</text><text x="48" y="522" class="m">oficina_ddd:sha-&lt;commit&gt;</text>
+
+    <path class="ctrl" d="M137 178V208" marker-end="url(#ac)"/>
+    <path class="ctrl" d="M137 260V290" marker-end="url(#ac)"/>
+    <path class="ctrl" d="M137 348V378" marker-end="url(#ac)"/>
+    <text x="146" y="368" class="lc">se passar</text>
+    <path class="ctrl" d="M137 436V478" marker-end="url(#ac)"/>
+    <text x="146" y="462" class="lc">push</text>
+
+    <rect x="32" y="640" width="210" height="64" rx="8" class="box"/>
+    <text x="48" y="663" class="t">Terraform</text><text x="48" y="682" class="s">VPC · EKS · RDS · IAM</text><text x="48" y="697" class="s">+ addon do LB Controller</text>
+
+    <!-- AWS -->
+    <rect x="280" y="90" width="988" height="650" rx="12" fill="none" stroke="var(--aws)" stroke-width="1.6"/>
+    <text x="296" y="113" class="zl" style="fill:var(--aws)">AWS · sa-east-1</text>
+
+    <rect x="298" y="128" width="782" height="598" rx="10" fill="none" stroke="var(--line)" stroke-width="1.4" stroke-dasharray="3 3"/>
+    <text x="312" y="148" class="zl">VPC 10.0.0.0/16 · 2 zonas de disponibilidade</text>
+
+    <!-- Subnets públicas -->
+    <rect x="312" y="158" width="754" height="104" rx="8" fill="var(--band-pub)"/>
+    <text x="324" y="178" class="zl">Subnets públicas</text>
+    <rect x="540" y="185" width="210" height="58" rx="8" class="box"/>
+    <text x="556" y="208" class="t">Application LB</text><text x="556" y="227" class="s">internet-facing · HTTP</text>
+    <rect x="860" y="185" width="194" height="58" rx="8" class="box"/>
+    <text x="876" y="208" class="t">NAT Gateway</text><text x="876" y="227" class="s">saída dos nós (pull GHCR)</text>
+
+    <!-- Subnets privadas / EKS -->
+    <rect x="312" y="274" width="754" height="294" rx="8" fill="var(--band-priv)"/>
+    <text x="324" y="294" class="zl">Subnets privadas</text>
+    <rect x="322" y="304" width="734" height="254" rx="9" fill="none" stroke="var(--req)" stroke-opacity=".45" stroke-width="1.4"/>
+    <text x="336" y="324" class="t" style="font-size:13px">EKS 1.34</text><text x="404" y="324" class="s">node group 2× t3.medium</text>
+
+    <rect x="334" y="336" width="502" height="210" rx="8" fill="var(--surface)" fill-opacity=".55" stroke="var(--line)"/>
+    <text x="346" y="354" class="m">namespace oficina-api</text>
+
+    <rect x="350" y="372" width="130" height="62" rx="8" class="box"/>
+    <text x="364" y="398" class="t">Ingress</text><text x="364" y="417" class="m">class alb</text>
+    <rect x="510" y="372" width="140" height="62" rx="8" class="box"/>
+    <text x="524" y="398" class="t">Service</text><text x="524" y="417" class="m">ClusterIP :80</text>
+    <rect x="680" y="364" width="142" height="150" rx="8" class="box" style="stroke:var(--req);stroke-width:1.8"/>
+    <text x="694" y="388" class="t">Pod</text><text x="694" y="406" class="m">oficina-api</text>
+    <text x="694" y="430" class="s">Spring Boot :8080</text>
+    <text x="694" y="452" class="s">probes liveness</text><text x="694" y="468" class="s">e readiness</text>
+    <text x="694" y="492" class="s">usuário não-root</text>
+
+    <rect x="350" y="462" width="130" height="52" rx="8" class="box"/>
+    <text x="364" y="484" class="t" style="font-size:14px">ConfigMap</text><text x="364" y="502" class="s">perfil, porta</text>
+    <rect x="510" y="462" width="140" height="52" rx="8" class="box"/>
+    <text x="524" y="484" class="t" style="font-size:14px">Secret</text><text x="524" y="502" class="s">JDBC, JWT, admin</text>
+
+    <path class="ctrl" d="M650 488H678" marker-end="url(#ac)"/>
+    <path class="ctrl" d="M415 514V530H730V516" marker-end="url(#ac)"/>
+    <text x="560" y="543" class="lc">envFrom</text>
+
+    <rect x="848" y="336" width="196" height="210" rx="8" fill="var(--surface)" fill-opacity=".55" stroke="var(--line)"/>
+    <text x="860" y="354" class="m">namespace kube-system</text>
+    <rect x="862" y="372" width="168" height="72" rx="8" class="box"/>
+    <text x="876" y="396" class="t" style="font-size:14px">AWS Load Balancer</text><text x="876" y="414" class="t" style="font-size:14px">Controller</text><text x="876" y="433" class="s">Helm · IRSA</text>
+
+    <!-- Subnets de banco -->
+    <rect x="312" y="580" width="754" height="134" rx="8" fill="var(--band-db)"/>
+    <text x="324" y="600" class="zl">Subnets de banco</text>
+    <rect x="600" y="616" width="230" height="78" rx="8" class="box" style="stroke:var(--req);stroke-width:1.8"/>
+    <text x="616" y="640" class="t">RDS PostgreSQL 16</text><text x="616" y="659" class="s">privado · criptografado</text><text x="616" y="677" class="s">backup de 7 dias</text>
+    <text x="324" y="650" class="s">Security group: aceita a porta</text><text x="324" y="667" class="s">5432 apenas dos nós do EKS</text>
+
+    <!-- Serviços regionais -->
+    <text x="1096" y="148" class="zl">Serviços AWS</text>
+    <rect x="1096" y="372" width="158" height="72" rx="8" class="box"/>
+    <text x="1110" y="396" class="t" style="font-size:14px">IAM Role</text><text x="1110" y="415" class="s">permissões do</text><text x="1110" y="431" class="s">LB Controller</text>
+    <rect x="1096" y="616" width="158" height="78" rx="8" class="box"/>
+    <text x="1110" y="640" class="t" style="font-size:14px">Secrets Manager</text><text x="1110" y="659" class="s">senha mestre</text><text x="1110" y="675" class="s">do RDS</text>
+    <rect x="1096" y="185" width="158" height="58" rx="8" class="box"/>
+    <text x="1110" y="208" class="t" style="font-size:14px">CloudWatch</text><text x="1110" y="227" class="s">logs EKS e RDS</text>
+
+    <!-- Usuário e fluxo de requisição -->
+    <rect x="545" y="18" width="200" height="50" rx="8" class="box" style="stroke:var(--req);stroke-width:1.8"/>
+    <text x="561" y="40" class="t">Cliente / Postman</text><text x="561" y="58" class="s">Swagger, /api/v1/…</text>
+    <path class="req" d="M645 68V183" marker-end="url(#ar)"/>
+    <text x="653" y="84" class="lr">HTTP</text>
+    <path class="req" d="M600 243V300H415V370" marker-end="url(#ar)"/>
+    <path class="req" d="M480 403H508" marker-end="url(#ar)"/>
+    <path class="req" d="M650 403H678" marker-end="url(#ar)"/>
+    <text x="654" y="395" class="lr">:8080</text>
+    <path class="req" d="M790 514V614" marker-end="url(#ar)"/>
+    <text x="798" y="600" class="lr">JDBC :5432</text>
+
+    <!-- Controle -->
+    <path class="ctrl" d="M946 372V290H700V245" marker-end="url(#ac)"/>
+    <text x="800" y="284" class="lc">cria o ALB a partir do Ingress</text>
+    <path class="ctrl" d="M1030 408H1094" marker-end="url(#ac)"/>
+    <text x="1040" y="400" class="lc">IRSA</text>
+    <path class="ctrl" d="M830 655H1094" marker-end="url(#ac)"/>
+    <text x="900" y="647" class="lc">senha gerenciada</text>
+    <path class="ctrl" d="M242 408H320" marker-end="url(#ac)"/>
+    <text x="252" y="400" class="lc">kubectl</text>
+    <path class="ctrl" d="M242 672H278" marker-end="url(#ac)"/>
+  </svg>
+  </div>
+
+  <div class="legend">
+    <span><i></i>Caminho da requisição</span>
+    <span><i class="c"></i>Entrega, configuração e permissões</span>
+  </div>
+</main>
