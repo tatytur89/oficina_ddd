@@ -12,12 +12,15 @@ import com.auth0.jwt.algorithms.Algorithm;
 import com.auth0.jwt.exceptions.JWTCreationException;
 import com.auth0.jwt.exceptions.JWTVerificationException;
 
+import br.com.fiap.ports.out.TokenGeneratorPort;
+
 @Service
-public class TokenService {
+public class TokenService implements TokenGeneratorPort {
 // A chave secreta deve vir do application.properties
     @Value("${api.security.token.secret}")
     private String secret;
 
+    @Override
     public String gerarToken(String subject) {
         try {
             Algorithm algorithm = Algorithm.HMAC256(secret);
