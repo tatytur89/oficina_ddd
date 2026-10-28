@@ -16,7 +16,8 @@
   },
   "variable": [
     { "key": "token", "value": "" },
-    { "key": "chaveAcesso", "value": "" }
+    { "key": "chaveAcesso", "value": "" },
+    { "key": "versaoOrcamento", "value": "0" }
   ],
   "item": [
     {
@@ -309,19 +310,38 @@
         },
         {
           "name": "Enviar orcamento",
-          "request": {"method": "PATCH", "url": {"raw": "http://localhost:8089/api/v1/ordens-servico/1/orcamento", "host": ["http://localhost:8089"], "path": ["api", "v1", "ordens-servico", "1", "orcamento"]}}
+          "event": [{"listen": "test", "script": {"type": "text/javascript", "exec": ["if (pm.response.code === 200) {", "  const body = pm.response.json();", "  if (body.dados && body.dados.versaoOrcamento !== undefined) pm.collectionVariables.set('versaoOrcamento', body.dados.versaoOrcamento);", "}"]}}],
+          "request": {"method": "PATCH", "description": "Exige EM_DIAGNOSTICO com pelo menos um servico. Incrementa a versao do orcamento e limpa a decisao. A resposta salva versaoOrcamento para os callbacks abaixo.", "url": {"raw": "http://localhost:8089/api/v1/ordens-servico/1/orcamento", "host": ["http://localhost:8089"], "path": ["api", "v1", "ordens-servico", "1", "orcamento"]}}
         },
         {
           "name": "Atualizar status da OS",
-          "request": {"method": "PATCH", "url": {"raw": "http://localhost:8089/api/v1/ordens-servico/1/status/EM_DIAGNOSTICO", "host": ["http://localhost:8089"], "path": ["api", "v1", "ordens-servico", "1", "status", "EM_DIAGNOSTICO"]}}
+          "request": {"method": "PATCH", "description": "Transicao administrativa. Nao use EM_EXECUCAO: inicio de execucao exige callback de aprovacao por chave e versao. O exemplo RECEBIDA -> EM_DIAGNOSTICO e uma alternativa ao endpoint de diagnostico, nao deve ser repetido depois dele.", "url": {"raw": "http://localhost:8089/api/v1/ordens-servico/1/status/EM_DIAGNOSTICO", "host": ["http://localhost:8089"], "path": ["api", "v1", "ordens-servico", "1", "status", "EM_DIAGNOSTICO"]}}
         },
         {
           "name": "Acompanhar OS (pagina publica HTML)",
           "request": {"method": "GET", "auth": {"type": "noauth"}, "url": {"raw": "http://localhost:8089/acompanhamento/1?chave={{chaveAcesso}}", "host": ["http://localhost:8089"], "path": ["acompanhamento", "1"], "query": [{"key": "chave", "value": "{{chaveAcesso}}"}]}}
         },
         {
-          "name": "Aprovar orcamento (publico)",
-          "request": {"method": "POST", "auth": {"type": "noauth"}, "url": {"raw": "http://localhost:8089/acompanhamento/1/aprovar?chave={{chaveAcesso}}", "host": ["http://localhost:8089"], "path": ["acompanhamento", "1", "aprovar"], "query": [{"key": "chave", "value": "{{chaveAcesso}}"}]}}
+          "name": "Aprovar orcamento por callback JSON (sem JWT)",
+          "request": {
+            "method": "POST",
+            "auth": {"type": "noauth"},
+            "description": "Use apos Enviar orcamento. A chave UUID da OS autentica a chamada, sem JWT. Aprova a versao atual, inicia execucao e baixa estoque. Repeticao da mesma decisao/versao e idempotente, sem nova gravacao nem baixa. Versao diferente, decisao contraditoria ou chave invalida retornam 400. A resposta inclui versaoOrcamento e decisaoOrcamento.",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "body": {"mode": "raw", "raw": "{\n  \"chave\": \"{{chaveAcesso}}\",\n  \"versaoOrcamento\": {{versaoOrcamento}},\n  \"aprovado\": true\n}", "options": {"raw": {"language": "json"}}},
+            "url": {"raw": "http://localhost:8089/api/v1/ordens-servico/1/decisao-orcamento", "host": ["http://localhost:8089"], "path": ["api", "v1", "ordens-servico", "1", "decisao-orcamento"]}
+          }
+        },
+        {
+          "name": "Recusar orcamento por callback JSON (alternativa, sem JWT)",
+          "request": {
+            "method": "POST",
+            "auth": {"type": "noauth"},
+            "description": "Alternativa a aprovacao: nao execute apos aprovar a mesma versao esperando sucesso. A recusa volta a EM_DIAGNOSTICO mantendo os itens, sem baixar estoque. Repeticao identica e idempotente. Apos revisar o diagnostico, execute Enviar orcamento para obter nova versao antes de outra decisao.",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "body": {"mode": "raw", "raw": "{\n  \"chave\": \"{{chaveAcesso}}\",\n  \"versaoOrcamento\": {{versaoOrcamento}},\n  \"aprovado\": false\n}", "options": {"raw": {"language": "json"}}},
+            "url": {"raw": "http://localhost:8089/api/v1/ordens-servico/1/decisao-orcamento", "host": ["http://localhost:8089"], "path": ["api", "v1", "ordens-servico", "1", "decisao-orcamento"]}
+          }
         },
         {
           "name": "Avaliar servico (publico)",

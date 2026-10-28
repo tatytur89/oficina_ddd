@@ -72,7 +72,7 @@ public class OrdemServicoService implements OrdemServicoUseCase {
     @Override
     @Transactional
     public OrdemServico realizarDiagnostico(Long osId, List<ItemDiagnostico> servicos, List<ItemDiagnostico> pecas, LocalDateTime dataPrevistaEntrega) {
-        OrdemServico os = osRepositoryPort.buscarPorId(osId)
+        OrdemServico os = osRepositoryPort.buscarPorIdParaAtualizacao(osId)
                 .orElseThrow(() -> new ResourceNotFoundException("OS não encontrada com ID: " + osId));
 
         os.transicionarPara(StatusOS.EM_DIAGNOSTICO);
@@ -101,7 +101,7 @@ public class OrdemServicoService implements OrdemServicoUseCase {
     @Override
     @Transactional
     public OrdemServico adicionarServico(Long osId, Long servicoId, int quantidade) {
-        OrdemServico os = osRepositoryPort.buscarPorId(osId)
+        OrdemServico os = osRepositoryPort.buscarPorIdParaAtualizacao(osId)
                 .orElseThrow(() -> new ResourceNotFoundException("OS não encontrada com ID: " + osId));
 
         Servico servico = servicoUseCase.buscarPorId(servicoId);
@@ -113,7 +113,7 @@ public class OrdemServicoService implements OrdemServicoUseCase {
     @Override
     @Transactional
     public OrdemServico adicionarPeca(Long osId, Long pecaId, int quantidade) {
-        OrdemServico os = osRepositoryPort.buscarPorId(osId)
+        OrdemServico os = osRepositoryPort.buscarPorIdParaAtualizacao(osId)
                 .orElseThrow(() -> new ResourceNotFoundException("OS não encontrada com ID: " + osId));
 
         Peca peca = pecaUseCase.buscarPorId(pecaId);
@@ -174,14 +174,10 @@ public class OrdemServicoService implements OrdemServicoUseCase {
     @Override
     @Transactional
     public OrdemServico atualizarStatus(Long id, StatusOS novoStatus) {
-        OrdemServico os = osRepositoryPort.buscarPorId(id)
+        OrdemServico os = osRepositoryPort.buscarPorIdParaAtualizacao(id)
             .orElseThrow(() -> new ResourceNotFoundException("OS não encontrada com ID: " + id));
 
         os.transicionarPara(novoStatus);
-
-        if (novoStatus == StatusOS.EM_EXECUCAO) {
-            baixarEstoqueDosItens(os);
-        }
 
         return osRepositoryPort.salvar(os);
     }
@@ -189,7 +185,7 @@ public class OrdemServicoService implements OrdemServicoUseCase {
     @Override
     @Transactional
     public OrdemServico enviarOrcamento(Long id) {
-        OrdemServico os = osRepositoryPort.buscarPorId(id)
+        OrdemServico os = osRepositoryPort.buscarPorIdParaAtualizacao(id)
             .orElseThrow(() -> new ResourceNotFoundException("OS não encontrada com ID: " + id));
 
         os.enviarOrcamento();
@@ -199,19 +195,33 @@ public class OrdemServicoService implements OrdemServicoUseCase {
     @Override
     @Transactional
     public OrdemServico aprovarOrcamento(Long id, String chave) {
-        OrdemServico os = osRepositoryPort.buscarPorId(id)
+        OrdemServico os = osRepositoryPort.buscarPorIdParaAtualizacao(id)
             .orElseThrow(() -> new ResourceNotFoundException("OS não encontrada com ID: " + id));
+        return aplicarDecisao(os, chave, os.getVersaoOrcamento(), true);
+    }
 
-        os.aprovarOrcamento(chave);
-        baixarEstoqueDosItens(os);
+    @Override
+    @Transactional
+    public OrdemServico decidirOrcamento(Long id, String chave, long versaoOrcamento, boolean aprovado) {
+        OrdemServico os = osRepositoryPort.buscarPorIdParaAtualizacao(id)
+                .orElseThrow(() -> new ResourceNotFoundException("OS não encontrada com ID: " + id));
+        return aplicarDecisao(os, chave, versaoOrcamento, aprovado);
+    }
 
+    private OrdemServico aplicarDecisao(OrdemServico os, String chave, long versaoOrcamento, boolean aprovado) {
+        if (!os.decidirOrcamento(chave, versaoOrcamento, aprovado)) {
+            return os;
+        }
+        if (aprovado) {
+            baixarEstoqueDosItens(os);
+        }
         return osRepositoryPort.salvar(os);
     }
 
     @Override
     @Transactional
     public OrdemServico avaliarServico(Long id, String chave, int nota, String comentario) {
-        OrdemServico os = osRepositoryPort.buscarPorId(id)
+        OrdemServico os = osRepositoryPort.buscarPorIdParaAtualizacao(id)
             .orElseThrow(() -> new ResourceNotFoundException("OS não encontrada com ID: " + id));
 
         os.validarChaveAcesso(chave);

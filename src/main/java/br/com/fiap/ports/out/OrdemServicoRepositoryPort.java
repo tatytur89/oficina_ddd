@@ -10,6 +10,8 @@ import br.com.fiap.domain.valueobjects.StatusOS;
 public interface OrdemServicoRepositoryPort {
     OrdemServico salvar(OrdemServico os);
     Optional<OrdemServico> buscarPorId(Long id);
+    // Exige transação abrangendo leitura, decisão e gravação da OS.
+    Optional<OrdemServico> buscarPorIdParaAtualizacao(Long id);
     List<OrdemServico> buscarTodas();
     List<OrdemServico> buscarPorClienteId(Long clienteId);
     List<OrdemServico> buscarPorVeiculoId(Long veiculoId);

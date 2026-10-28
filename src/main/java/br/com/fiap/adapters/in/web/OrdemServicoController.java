@@ -22,6 +22,7 @@ import br.com.fiap.adapters.in.web.DTO.OrdemServico.OrdemServicoCreateRequest;
 import br.com.fiap.adapters.in.web.DTO.OrdemServico.OrdemServicoResponse;
 import br.com.fiap.adapters.in.web.DTO.OrdemServico.RealizarDiagnosticoRequest;
 import br.com.fiap.adapters.in.web.DTO.OrdemServico.TempoMedioExecucaoResponse;
+import br.com.fiap.adapters.in.web.DTO.OrdemServico.DecisaoOrcamentoRequest;
 import br.com.fiap.adapters.in.web.mapper.OrdemServicoMapper;
 import br.com.fiap.domain.entities.OrdemServico;
 import br.com.fiap.domain.valueobjects.StatusOS;
@@ -47,6 +48,24 @@ public class OrdemServicoController {
 
     public OrdemServicoController(OrdemServicoUseCase osUseCase) {
         this.osUseCase = osUseCase;
+    }
+
+    @io.swagger.v3.oas.annotations.security.SecurityRequirements
+    @Operation(summary = "Receber aprovação ou recusa externa do orçamento",
+            description = "Autentica pela chave da OS e exige a versão do orçamento. "
+                    + "Repetir a mesma decisão é idempotente; versão antiga ou decisão contraditória é rejeitada. "
+                    + "A aprovação inicia execução e baixa estoque; a recusa retorna ao diagnóstico sem baixar estoque.",
+            security = {})
+    @ApiResponses({
+        @ApiResponse(responseCode = "200", description = "Decisão recebida ou repetição da mesma decisão"),
+        @ApiResponse(responseCode = "400", description = "Chave, versão, decisão ou estado inválido"),
+        @ApiResponse(responseCode = "404", description = "OS não encontrada")
+    })
+    @PostMapping("/{id}/decisao-orcamento")
+    public ResponseEntity<Response<OrdemServicoResponse>> decidirOrcamento(
+            @PathVariable Long id, @Valid @RequestBody DecisaoOrcamentoRequest request) {
+        OrdemServico os = osUseCase.decidirOrcamento(id, request.chave(), request.versaoOrcamento(), request.aprovado());
+        return ResponseEntity.ok(new Response<>("success", "Decisão do orçamento registrada", OrdemServicoMapper.toResponse(os)));
     }
 
     @Operation(
@@ -349,12 +368,13 @@ public class OrdemServicoController {
             |---|---|
             | RECEBIDA | EM_DIAGNOSTICO |
             | EM_DIAGNOSTICO | AGUARDANDO_APROVACAO |
-            | AGUARDANDO_APROVACAO | EM_EXECUCAO |
+            | AGUARDANDO_APROVACAO | Decisão do cliente pelo endpoint de orçamento |
             | EM_EXECUCAO | FINALIZADA |
             | FINALIZADA | ENTREGUE |
             | ENTREGUE | *(nenhum)* |
 
-            Ao transicionar para `EM_EXECUCAO`, o estoque de cada peça vinculada à OS é baixado automaticamente.
+            `EM_EXECUCAO` exige aprovação pela chave e versão do orçamento; não pode ser solicitada por este PATCH.
+            A transição para `AGUARDANDO_APROVACAO` exige ao menos um serviço e gera nova versão do orçamento.
             """
     )
     @ApiResponses(value = {
@@ -369,7 +389,7 @@ public class OrdemServicoController {
             @Parameter(description = "ID da Ordem de Serviço", example = "1", required = true)
             @PathVariable Long id,
 
-            @Parameter(description = "Novo status da OS", example = "EM_EXECUCAO", required = true)
+            @Parameter(description = "Novo status administrativo (execução exige decisão do cliente)", example = "FINALIZADA", required = true)
             @PathVariable StatusOS status) {
 
         OrdemServico os = osUseCase.atualizarStatus(id, status);

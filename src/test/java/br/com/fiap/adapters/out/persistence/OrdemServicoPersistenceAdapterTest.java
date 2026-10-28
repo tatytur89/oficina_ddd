@@ -13,6 +13,9 @@ import br.com.fiap.domain.entities.Servico;
 import br.com.fiap.domain.valueobjects.Preco;
 import br.com.fiap.domain.valueobjects.StatusOS;
 
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.LockModeType;
+
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
@@ -27,6 +30,12 @@ class OrdemServicoPersistenceAdapterTest {
     @Autowired
     private OrdemServicoPersistenceAdapter osPersistenceAdapter;
 
+    @Autowired
+    private OrdemServicoJpaRepository jpaRepository;
+
+    @Autowired
+    private EntityManager entityManager;
+
     private OrdemServico novaOS(Long clienteId, Long veiculoId, StatusOS status, LocalDateTime dataAbertura) {
         return new OrdemServico(null, clienteId, veiculoId, status, dataAbertura, null, null, "obs",
                 new Preco(BigDecimal.ZERO), new Preco(BigDecimal.ZERO), new Preco(BigDecimal.ZERO), null, null, "chave-teste", null, null);
@@ -39,6 +48,55 @@ class OrdemServicoPersistenceAdapterTest {
 
         assertNotNull(salva.getId());
         assertEquals(StatusOS.RECEBIDA, salva.getStatus());
+    }
+
+    @Test
+    void devePreservarVersaoERecusaDoOrcamentoAposRecarregar() {
+        var zero = new Preco(BigDecimal.ZERO);
+        var recusada = new OrdemServico(null, 1L, 1L, StatusOS.EM_DIAGNOSTICO,
+                LocalDateTime.now(), null, null, "orcamento recusado", zero, zero, zero,
+                null, null, "chave-teste", null, null, 2L, false);
+
+        Long id = osPersistenceAdapter.salvar(recusada).getId();
+        entityManager.flush();
+        entityManager.clear();
+
+        OrdemServico recarregada = osPersistenceAdapter.buscarPorId(id).orElseThrow();
+        assertEquals(2L, recarregada.getVersaoOrcamento());
+        assertEquals(Boolean.FALSE, recarregada.getDecisaoOrcamento());
+        assertEquals(StatusOS.EM_DIAGNOSTICO, recarregada.getStatus());
+    }
+
+    @Test
+    void deveTratarVersaoNulaLegadaComoZeroESemDecisao() {
+        var legada = new OrdemServicoJpaEntity(null, 1L, 1L, StatusOS.AGUARDANDO_APROVACAO.name(),
+                LocalDateTime.now(), null, null, "legada", BigDecimal.ZERO,
+                BigDecimal.ZERO, BigDecimal.ZERO, "chave-legada", null, null);
+        Long id = jpaRepository.saveAndFlush(legada).getId();
+        entityManager.clear();
+
+        OrdemServico recarregada = osPersistenceAdapter.buscarPorId(id).orElseThrow();
+        assertEquals(0L, recarregada.getVersaoOrcamento());
+        assertNull(recarregada.getDecisaoOrcamento());
+    }
+
+    @Test
+    void deveBuscarOSComBloqueioDeEscritaNaTransacaoAtual() {
+        Long id = osPersistenceAdapter.salvar(
+                novaOS(1L, 1L, StatusOS.AGUARDANDO_APROVACAO, LocalDateTime.now())).getId();
+        entityManager.flush();
+        entityManager.clear();
+
+        OrdemServico bloqueada = osPersistenceAdapter.buscarPorIdParaAtualizacao(id).orElseThrow();
+
+        assertEquals(id, bloqueada.getId());
+        var entidadeGerenciada = entityManager.find(OrdemServicoJpaEntity.class, id);
+        assertEquals(LockModeType.PESSIMISTIC_WRITE, entityManager.getLockMode(entidadeGerenciada));
+    }
+
+    @Test
+    void deveRetornarVazioAoBloquearOSInexistente() {
+        assertTrue(osPersistenceAdapter.buscarPorIdParaAtualizacao(Long.MAX_VALUE).isEmpty());
     }
 
     @Test

@@ -86,20 +86,36 @@ class AcompanhamentoOSControllerTest {
 
     @Test
     void deveRedirecionarAposAprovarComSucesso() throws Exception {
-        when(osUseCase.aprovarOrcamento(1L, "chave-correta")).thenReturn(os(StatusOS.EM_EXECUCAO));
+        when(osUseCase.decidirOrcamento(1L, "chave-correta", 0L, true)).thenReturn(os(StatusOS.EM_EXECUCAO));
 
-        mockMvc.perform(post("/acompanhamento/1/aprovar").param("chave", "chave-correta"))
+        mockMvc.perform(post("/acompanhamento/1/aprovar").param("chave", "chave-correta").param("versaoOrcamento", "0"))
                 .andExpect(status().is3xxRedirection())
                 .andExpect(redirectedUrl("/acompanhamento/1?chave=chave-correta"));
     }
 
     @Test
     void deveRetornar400AoAprovarComChaveInvalida() throws Exception {
-        when(osUseCase.aprovarOrcamento(anyLong(), anyString()))
+        when(osUseCase.decidirOrcamento(anyLong(), anyString(), anyLong(), org.mockito.ArgumentMatchers.eq(true)))
                 .thenThrow(new IllegalArgumentException("Chave de acesso inválida."));
 
-        mockMvc.perform(post("/acompanhamento/1/aprovar").param("chave", "errada"))
+        mockMvc.perform(post("/acompanhamento/1/aprovar").param("chave", "errada").param("versaoOrcamento", "0"))
                 .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void deveRedirecionarAposRecusarSemIniciarExecucao() throws Exception {
+        when(osUseCase.decidirOrcamento(1L, "chave-correta", 0L, false)).thenReturn(os(StatusOS.EM_DIAGNOSTICO));
+        mockMvc.perform(post("/acompanhamento/1/recusar").param("chave", "chave-correta").param("versaoOrcamento", "0"))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl("/acompanhamento/1?chave=chave-correta"));
+        org.mockito.Mockito.verify(osUseCase).decidirOrcamento(1L, "chave-correta", 0L, false);
+    }
+
+    @Test
+    void formularioNaoPodeDecidirSemVersaoDoOrcamento() throws Exception {
+        mockMvc.perform(post("/acompanhamento/1/aprovar").param("chave", "chave-correta"))
+                .andExpect(status().isBadRequest());
+        org.mockito.Mockito.verifyNoInteractions(osUseCase);
     }
 
     @Test

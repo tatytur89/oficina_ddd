@@ -49,6 +49,8 @@ private final SecurityFilter securityFilter;
                     // Libera a página pública de acompanhamento/aprovação/avaliação de OS (chave de acesso própria da OS)
                     req.requestMatchers(HttpMethod.GET, "/acompanhamento/*").permitAll();
                     req.requestMatchers(HttpMethod.POST, "/acompanhamento/*/aprovar").permitAll();
+                    req.requestMatchers(HttpMethod.POST, "/acompanhamento/*/recusar").permitAll();
+                    req.requestMatchers(HttpMethod.POST, "/api/v1/ordens-servico/*/decisao-orcamento").permitAll();
                     req.requestMatchers(HttpMethod.POST, "/acompanhamento/*/avaliar").permitAll();
                     
                     // Exige autenticação (token JWT) para todas as outras rotas

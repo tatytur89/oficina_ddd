@@ -174,7 +174,17 @@
             <form th:action="@{'/acompanhamento/' + ${id} + '/aprovar'}" method="post">
                 <input type="hidden" name="chave" th:value="${chave}"/>
                 <button type="submit">Aprovar orçamento</button>
+                <input type="hidden" name="versaoOrcamento" th:value="${versaoOrcamento}"/>
             </form>
+            <form th:action="@{'/acompanhamento/' + ${id} + '/recusar'}" method="post">
+                <input type="hidden" name="chave" th:value="${chave}"/>
+                <input type="hidden" name="versaoOrcamento" th:value="${versaoOrcamento}"/>
+                <button type="submit">Recusar orçamento</button>
+            </form>
+        </div>
+
+        <div class="aviso" th:if="${decisaoOrcamento != null and !decisaoOrcamento}">
+            Orçamento recusado. A OS retornou ao diagnóstico para revisão pela oficina.
         </div>
 
         <div class="acao" th:if="${podeAvaliar}">

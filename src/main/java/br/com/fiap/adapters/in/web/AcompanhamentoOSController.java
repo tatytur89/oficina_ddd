@@ -32,8 +32,14 @@ public class AcompanhamentoOSController {
     }
 
     @PostMapping("/acompanhamento/{id}/aprovar")
-    public String aprovar(@PathVariable Long id, @RequestParam String chave) {
-        osUseCase.aprovarOrcamento(id, chave);
+    public String aprovar(@PathVariable Long id, @RequestParam String chave, @RequestParam long versaoOrcamento) {
+        osUseCase.decidirOrcamento(id, chave, versaoOrcamento, true);
+        return "redirect:/acompanhamento/" + id + "?chave=" + chave;
+    }
+
+    @PostMapping("/acompanhamento/{id}/recusar")
+    public String recusar(@PathVariable Long id, @RequestParam String chave, @RequestParam long versaoOrcamento) {
+        osUseCase.decidirOrcamento(id, chave, versaoOrcamento, false);
         return "redirect:/acompanhamento/" + id + "?chave=" + chave;
     }
 
@@ -72,6 +78,8 @@ public class AcompanhamentoOSController {
         model.addAttribute("servicos", os.getServicos());
         model.addAttribute("pecas", os.getPecas());
         model.addAttribute("chave", chave);
+        model.addAttribute("versaoOrcamento", os.getVersaoOrcamento());
+        model.addAttribute("decisaoOrcamento", os.getDecisaoOrcamento());
         model.addAttribute("podeAprovar", os.getStatus() == StatusOS.AGUARDANDO_APROVACAO);
         model.addAttribute("podeAvaliar", os.getStatus() == StatusOS.ENTREGUE && os.getNotaAvaliacao() == null);
         model.addAttribute("notaAvaliacao", os.getNotaAvaliacao());

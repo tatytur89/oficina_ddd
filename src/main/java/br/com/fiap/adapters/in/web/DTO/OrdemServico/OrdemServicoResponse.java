@@ -26,7 +26,9 @@ public record OrdemServicoResponse(
         List<PecaOSResponse> pecas,
         @Schema(description = "Chave de acesso para a página pública de acompanhamento/aprovação/avaliação do cliente", example = "3fa85f64-5717-4562-b3fc-2c963f66afa6") String chaveAcesso,
         @Schema(description = "Nota de avaliação do cliente (1-5), preenchida após a entrega", example = "5") Integer notaAvaliacao,
-        @Schema(description = "Comentário de avaliação do cliente", example = "Ótimo atendimento!") String comentarioAvaliacao
+        @Schema(description = "Comentário de avaliação do cliente", example = "Ótimo atendimento!") String comentarioAvaliacao,
+        @Schema(description = "Versão a informar na notificação de decisão", example = "1") long versaoOrcamento,
+        @Schema(description = "Decisão da versão atual: true aprovada, false recusada, null pendente") Boolean decisaoOrcamento
 ) {
     public OrdemServicoResponse(OrdemServico os) {
         this(
@@ -45,7 +47,9 @@ public record OrdemServicoResponse(
             os.getPecas().stream().map(PecaOSResponse::new).toList(),
             os.getChaveAcesso(),
             os.getNotaAvaliacao(),
-            os.getComentarioAvaliacao()
+            os.getComentarioAvaliacao(),
+            os.getVersaoOrcamento(),
+            os.getDecisaoOrcamento()
         );
     }
 

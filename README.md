@@ -258,7 +258,7 @@ Authorization: Bearer <token>
 
 No Swagger UI, clique em `Authorize`, cole o token JWT e confirme. Em seguida, utilize o botão `Try it out` nos endpoints protegidos.
 
-Todas as rotas administrativas exigem autenticação, exceto: login, Swagger UI e a consulta pública de acompanhamento de OS (`GET /api/v1/ordens-servico/{id}/acompanhar`).
+As rotas administrativas exigem JWT. Login, Swagger, healthcheck, informações de versão e a página de acompanhamento são públicos. A página valida a chave própria da OS; o callback `POST /api/v1/ordens-servico/{id}/decisao-orcamento` não exige JWT e autentica a decisão pela `chave` da OS enviada no corpo, junto com a versão do orçamento.
 
 ## Endpoints de clientes
 
@@ -397,6 +397,7 @@ Base: `/api/v1/ordens-servico`
 | GET | `/api/v1/ordens-servico/status/{status}` | Listar OS por status |
 | GET | `/api/v1/ordens-servico/periodo?inicio={data}&fim={data}` | Listar OS abertas num período |
 | PATCH | `/api/v1/ordens-servico/{id}/orcamento` | Enviar orçamento para aprovação |
+| POST | `/api/v1/ordens-servico/{id}/decisao-orcamento` | Receber aprovação ou recusa externa por chave e versão do orçamento, sem JWT |
 | PATCH | `/api/v1/ordens-servico/{id}/status/{status}` | Atualizar status da OS |
 | POST | `/api/v1/ordens-servico/{id}/diagnostico` | Registrar o diagnóstico completo (transiciona para `EM_DIAGNOSTICO` + adiciona serviços/peças numa só chamada) |
 | POST | `/api/v1/ordens-servico/{id}/servicos` | Adicionar um serviço à OS (exige `EM_DIAGNOSTICO`) |
@@ -463,20 +464,53 @@ RECEBIDA → EM_DIAGNOSTICO → AGUARDANDO_APROVACAO → EM_EXECUCAO → FINALIZ
 ```
 
 - A abertura pode registrar serviços e peças solicitados enquanto cria a OS em `RECEBIDA`. Depois de criada, os endpoints de adição de itens exigem `EM_DIAGNOSTICO`.
-- `enviarOrcamento` exige a OS em `EM_DIAGNOSTICO` e pelo menos um serviço vinculado.
-- Ao transicionar para `EM_EXECUCAO`, o estoque de cada peça vinculada é baixado automaticamente.
-- Não há caminho de cancelamento — cada status só avança para o próximo da lista.
+- `enviarOrcamento` exige a OS em `EM_DIAGNOSTICO` e pelo menos um serviço vinculado. Cada envio incrementa `versaoOrcamento` e limpa a decisão anterior.
+- A aprovação da versão vigente inicia `EM_EXECUCAO` e baixa o estoque das peças. O PATCH genérico de status não pode iniciar execução. A transição para `AGUARDANDO_APROVACAO`, mesmo pelo PATCH, aplica as validações e o versionamento do envio de orçamento.
+- A recusa retorna de `AGUARDANDO_APROVACAO` para `EM_DIAGNOSTICO`, preserva os itens e não baixa estoque. A equipe pode complementar o diagnóstico e enviar uma nova versão do orçamento.
+
+### Notificação externa de aprovação ou recusa
+
+Após `PATCH /api/v1/ordens-servico/{id}/orcamento`, use a `versaoOrcamento` retornada na resposta. Uma integração externa pode registrar a decisão sem login administrativo, apresentando a chave UUID daquela OS:
+
+```http
+POST /api/v1/ordens-servico/1/decisao-orcamento
+Content-Type: application/json
+```
+
+```json
+{
+  "chave": "UUID-DA-OS",
+  "versaoOrcamento": 1,
+  "aprovado": true
+}
+```
+
+Para recusar, envie `aprovado: false`. Os três campos são obrigatórios. A resposta mantém o envelope `status`, `message` e `dados`; a OS em `dados` inclui `versaoOrcamento` e `decisaoOrcamento` (`true` para aprovação, `false` para recusa e `null` enquanto aguarda decisão).
+
+- A primeira decisão válida recebe `200`. Aprovação inicia a execução; recusa devolve a OS ao diagnóstico.
+- Repetir a mesma decisão para a mesma versão é idempotente: retorna a OS atual com `200`, sem nova gravação nem baixa de estoque.
+- Versão diferente da vigente, decisão contrária à já registrada, chave inválida ou estado incompatível resultam em `400`. OS inexistente resulta em `404`.
+- Depois de um novo envio do orçamento, a versão anterior não pode decidir o orçamento novo. A integração deve usar a versão retornada no novo envio.
+- A decisão usa bloqueio pessimista por OS dentro da transação, serializando callbacks concorrentes da mesma OS. Isso não substitui o controle de concorrência de estoque entre OS diferentes.
+
+Na coleção Postman, **Enviar orçamento** salva `versaoOrcamento` automaticamente. As requisições JSON de aprovação e recusa são alternativas: não execute ambas para a mesma versão esperando sucesso.
+
+### Atualização do schema para a decisão de orçamento
+
+Antes de implantar esta versão sobre um PostgreSQL existente com `ddl-auto=validate`, aplique [`docs/sql/orcamento-decisao.sql`](docs/sql/orcamento-decisao.sql). O script acrescenta `versao_orcamento` e `decisao_orcamento` e pode ser reaplicado. Registros legados sem versão são tratados como versão zero pela leitura da aplicação; a integração deve sempre usar a versão retornada para a OS.
+
+Esse script é uma atualização incremental: não cria o schema inicial nem automatiza o deploy do banco. O provisionamento e a execução controlada das atualizações de schema continuam sendo pré-requisitos do ambiente.
 
 ## Página de acompanhamento, aprovação e avaliação (cliente)
 
-Como o cliente não tem login no sistema, o acompanhamento da OS, a aprovação do orçamento e a avaliação do serviço acontecem por uma página HTML pública, protegida pela `chaveAcesso` gerada para aquela OS específica (não é um endpoint de API JSON):
+Como o cliente não tem login no sistema, o acompanhamento da OS, a aprovação ou recusa do orçamento e a avaliação do serviço também estão disponíveis por uma página HTML pública, protegida pela `chaveAcesso` gerada para aquela OS específica. Essa interface HTML complementa o callback JSON descrito acima:
 
 ```text
 GET  http://localhost:8080/acompanhamento/{id}?chave={chaveAcesso}
 ```
 
 - Mostra o status atual, datas, serviços/peças vinculados e o valor total.
-- Se o status for `AGUARDANDO_APROVACAO`, a página exibe um botão **"Aprovar orçamento"**, que envia `POST /acompanhamento/{id}/aprovar` e transiciona a OS para `EM_EXECUCAO`.
+- Se o status for `AGUARDANDO_APROVACAO`, a página oferece **Aprovar orçamento** e **Recusar orçamento**. Os formulários enviam `chave` e `versaoOrcamento` em campos ocultos para `POST /acompanhamento/{id}/aprovar` ou `POST /acompanhamento/{id}/recusar`. Ambos usam as mesmas regras de versão e idempotência do callback; uma página antiga não aprova uma versão nova.
 - Quando `FINALIZADA`, a página avisa que o veículo está pronto para retirada.
 - Quando `ENTREGUE` e ainda não avaliada, a página exibe um formulário de avaliação (nota de 1 a 5 + comentário opcional), enviado via `POST /acompanhamento/{id}/avaliar`. Depois de avaliada, a página passa a mostrar a nota e o comentário registrados.
 - A `chaveAcesso` **não expira** — permanece válida durante toda a vida da OS, inclusive depois da entrega, já que também é usada para a avaliação.

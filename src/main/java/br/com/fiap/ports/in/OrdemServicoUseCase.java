@@ -19,6 +19,7 @@ public interface OrdemServicoUseCase {
     OrdemServico atualizarStatus(Long id, StatusOS novoStatus);
     OrdemServico enviarOrcamento(Long id);
     OrdemServico aprovarOrcamento(Long id, String chave);
+    OrdemServico decidirOrcamento(Long id, String chave, long versaoOrcamento, boolean aprovado);
     OrdemServico avaliarServico(Long id, String chave, int nota, String comentario);
     OrdemServico buscarParaAcompanhamento(Long id, String chave);
     TempoMedioExecucao calcularTempoMedioExecucao();

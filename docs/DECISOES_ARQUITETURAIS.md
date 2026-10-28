@@ -44,9 +44,9 @@ Este documento registra as principais decisões de arquitetura e design do proje
 
 **Contexto:** a OS passa por status sequenciais (Recebida → Em diagnóstico → Aguardando aprovação → Em execução → Finalizada → Entregue), e transições fora dessa ordem (ex.: pular de Recebida direto para Entregue) não podem ser permitidas.
 
-**Decisão:** o enum `StatusOS` centraliza a tabela de transições válidas (`proximosStatusValidos()`), e a entidade `OrdemServico.transicionarPara(novoStatus)` é o único ponto que aplica essa regra.
+**Decisão:** o enum `StatusOS` centraliza a sequência de avanço (`proximosStatusValidos()`), aplicada internamente pela entidade. `transicionarPara` rejeita início genérico de execução e delega a passagem para `AGUARDANDO_APROVACAO` à operação `enviarOrcamento`, com suas pré-condições e incremento de versão. A operação `decidirOrcamento` é responsável por validar a chave e a versão, iniciar execução quando aprovada ou retornar ao diagnóstico quando recusada.
 
-**Justificativa:** inicialmente o projeto tinha métodos individuais por transição (`aprovar()`, `iniciarExecucao()`, `concluir()`...), cada um com sua própria checagem de status via `if` — duas fontes de verdade para a mesma regra, que podiam divergir (e de fato divergiam: um permitia cancelar em um estado que o outro não permitia). Consolidar numa tabela única no enum elimina essa duplicação: qualquer transição nova passa a exigir só uma entrada na tabela, não um método novo com sua própria validação.
+**Justificativa:** a tabela de sequência não substitui as invariantes da operação. Obrigar a decisão explícita evita que um PATCH administrativo simule autorização do cliente. A recusa é um resultado do orçamento que permite revisar o diagnóstico e reenviar uma versão nova, sem apagar os itens nem consumir estoque.
 
 **Alternativas consideradas:** manter os métodos individuais foi descartado justamente por ter causado a inconsistência observada durante o desenvolvimento — ver item correspondente no histórico de correções do projeto.
 
@@ -136,17 +136,21 @@ Este documento registra as principais decisões de arquitetura e design do proje
 
 ---
 
-## 12. Chave de acesso por OS para consulta, aprovação e avaliação do cliente
+## 12. Chave de acesso por OS para consulta, decisão do orçamento e avaliação
 
-**Contexto:** o cliente não tem login no sistema, mas precisa (a) consultar o progresso da própria OS, (b) aprovar o orçamento e (c) avaliar o serviço após a entrega — sem que isso vaze dados de outras OS. Uma primeira versão do endpoint público de acompanhamento (`GET /acompanhar` por ID sequencial, sem nenhuma verificação) permitia que qualquer pessoa trocasse o ID na URL e visse a OS de outro cliente (IDOR).
+**Contexto:** o cliente não tem login no sistema, mas precisa (a) consultar o progresso da própria OS, (b) aprovar ou recusar o orçamento e (c) avaliar o serviço após a entrega — sem que isso vaze dados de outras OS. Uma primeira versão do endpoint público de acompanhamento (`GET /acompanhar` por ID sequencial, sem nenhuma verificação) permitia que qualquer pessoa trocasse o ID na URL e visse a OS de outro cliente (IDOR).
 
-**Decisão:** cada OS recebe uma `chaveAcesso` única (UUID) gerada na criação. Essa mesma chave é usada para as três ações — consultar, aprovar e avaliar — através de uma página HTML renderizada com Thymeleaf (`GET /acompanhamento/{id}?chave=...`, `POST /acompanhamento/{id}/aprovar`, `POST /acompanhamento/{id}/avaliar`), fora do prefixo `/api/v1` já que deixou de ser um endpoint JSON. **A chave não expira por status** — permanece válida durante toda a vida da OS, inclusive após `ENTREGUE`.
+**Decisão:** cada OS recebe uma `chaveAcesso` única (UUID) gerada na criação. Ela protege consulta, aprovação, recusa e avaliação na interface Thymeleaf (`GET /acompanhamento/{id}?chave=...`, `POST /acompanhamento/{id}/aprovar`, `POST /acompanhamento/{id}/recusar`, `POST /acompanhamento/{id}/avaliar`). Aprovação e recusa incluem também a `versaoOrcamento` em campo oculto. Integrações externas usam `POST /api/v1/ordens-servico/{id}/decisao-orcamento`, público sem JWT, com `{chave, versaoOrcamento, aprovado}` no corpo JSON. A chave autentica acesso à OS; a versão associa a decisão ao orçamento mostrado ao cliente. **A chave não expira por status** — permanece válida durante toda a vida da OS, inclusive após `ENTREGUE`.
 
 > Revisão: a versão original desta decisão previa a chave expirando quando a OS chegasse a `ENTREGUE`. Isso foi revertido ao adicionar a avaliação do cliente (item 14) — o cliente precisa continuar usando a mesma chave *depois* da entrega para avaliar o serviço, então uma expiração nesse ponto quebraria exatamente o fluxo que ela deveria habilitar. A regra de negócio mudou de "a chave morre quando não há mais nada a fazer" para "a chave vive enquanto a OS existir".
 
 **Justificativa:** resolve o IDOR (sem a chave certa, nenhum dado da OS é exposto) e transforma a aprovação e a avaliação em ações reais do cliente, não um `PATCH` genérico feito pelo administrador em nome dele. Usar a mesma chave para as três ações evita gerenciar múltiplos segredos por OS. A página é renderizada com Thymeleaf (dependência nova) em vez de HTML montado como `String`, porque a página tem lógica condicional (botão de aprovação só aparece em `AGUARDANDO_APROVACAO`, formulário de avaliação só em `ENTREGUE` sem avaliação prévia) e estilo próprio — o que se beneficia de um motor de template em vez de concatenação manual.
 
 **Alternativas consideradas:** exigir CPF/CNPJ do cliente em vez de uma chave gerada foi descartado por ser uma prova de identidade mais fraca (documento não é secreto); um token separado por ação (um para consulta, outro para aprovação, outro para avaliação) foi descartado por adicionar segredos extras sem benefício de segurança adicional, já que a máquina de estados e a checagem de "já avaliada" já impedem reuso indevido; devolver HTML como `String` sem Thymeleaf foi descartado pela lógica condicional e estilo exigidos pela página.
+
+**Versionamento e repetição:** o envio do orçamento incrementa a versão e limpa a decisão. Repetir a mesma versão e decisão retorna sem salvar nem consumir estoque novamente; versão desatualizada e decisão contraditória são rejeitadas. Uma recusa preserva os itens, volta ao diagnóstico e permite novo envio. O callback obtém bloqueio pessimista da OS dentro da transação para serializar decisões simultâneas. A versão é uma revisão de negócio do orçamento, não um campo JPA `@Version` nem uma solução para concorrência de estoque entre OS diferentes.
+
+**Persistência:** versão e decisão são armazenadas em `ordens_servico`. Bancos existentes com `ddl-auto=validate` precisam receber `docs/sql/orcamento-decisao.sql` antes do rollout. A atualização é incremental e não implementa provisionamento nem migração inicial automatizada do banco.
 
 ---
 

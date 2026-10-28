@@ -42,6 +42,8 @@ public class OrdemServicoPersistenceAdapter implements OrdemServicoRepositoryPor
             os.getNotaAvaliacao(),
             os.getComentarioAvaliacao()
         );
+        entity.setVersaoOrcamento(os.getVersaoOrcamento());
+        entity.setDecisaoOrcamento(os.getDecisaoOrcamento());
 
         List<ServicoOSJpaEntity> servicoEntities = os.getServicos().stream()
             .map(s -> new ServicoOSJpaEntity(
@@ -67,6 +69,12 @@ public class OrdemServicoPersistenceAdapter implements OrdemServicoRepositoryPor
     @Override
     public Optional<OrdemServico> buscarPorId(Long id) {
         return jpaRepository.findById(id)
+                .map(this::mapearParaDominio);
+    }
+
+    @Override
+    public Optional<OrdemServico> buscarPorIdParaAtualizacao(Long id) {
+        return jpaRepository.findByIdParaAtualizacao(id)
                 .map(this::mapearParaDominio);
     }
 
@@ -144,7 +152,9 @@ public class OrdemServicoPersistenceAdapter implements OrdemServicoRepositoryPor
             pecas,
             entity.getChaveAcesso(),
             entity.getNotaAvaliacao(),
-            entity.getComentarioAvaliacao()
+            entity.getComentarioAvaliacao(),
+            entity.getVersaoOrcamento() == null ? 0L : entity.getVersaoOrcamento(),
+            entity.getDecisaoOrcamento()
         );
     }
 }
