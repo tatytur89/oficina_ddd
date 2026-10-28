@@ -3,6 +3,7 @@ package br.com.fiap.application.services;
 import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Comparator;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -132,7 +133,24 @@ public class OrdemServicoService implements OrdemServicoUseCase {
 
     @Override
     public List<OrdemServico> listarTodas() {
-        return osRepositoryPort.buscarTodas();
+        return osRepositoryPort.buscarTodas().stream()
+                .filter(os -> os.getStatus() != StatusOS.FINALIZADA && os.getStatus() != StatusOS.ENTREGUE)
+                .sorted(Comparator.comparingInt((OrdemServico os) -> prioridadeNaFila(os.getStatus()))
+                        .thenComparing(OrdemServico::getDataAbertura,
+                                Comparator.nullsLast(Comparator.naturalOrder()))
+                        .thenComparing(OrdemServico::getId,
+                                Comparator.nullsLast(Comparator.naturalOrder())))
+                .toList();
+    }
+
+    private int prioridadeNaFila(StatusOS status) {
+        return switch (status) {
+            case EM_EXECUCAO -> 0;
+            case AGUARDANDO_APROVACAO -> 1;
+            case EM_DIAGNOSTICO -> 2;
+            case RECEBIDA -> 3;
+            default -> throw new IllegalArgumentException("Status fora da fila operacional: " + status);
+        };
     }
 
     @Override

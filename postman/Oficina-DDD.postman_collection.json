@@ -284,8 +284,8 @@
           }
         },
         {
-          "name": "Listar OS",
-          "request": {"method": "GET", "url": {"raw": "http://localhost:8089/api/v1/ordens-servico", "host": ["http://localhost:8089"], "path": ["api", "v1", "ordens-servico"]}}
+          "name": "Listar fila operacional por prioridade e antiguidade",
+          "request": {"method": "GET", "description": "Prioridade: EM_EXECUCAO > AGUARDANDO_APROVACAO > EM_DIAGNOSTICO > RECEBIDA. Dentro de cada status, data de abertura crescente e ID crescente para desempate. FINALIZADA e ENTREGUE sao omitidas por filtro, sem exclusao dos registros. Historico continua nas consultas por ID, cliente, status e periodo, e nas metricas.", "url": {"raw": "http://localhost:8089/api/v1/ordens-servico", "host": ["http://localhost:8089"], "path": ["api", "v1", "ordens-servico"]}}
         },
         {
           "name": "Buscar OS por ID",
@@ -298,6 +298,10 @@
         {
           "name": "Listar OS por status",
           "request": {"method": "GET", "url": {"raw": "http://localhost:8089/api/v1/ordens-servico/status/RECEBIDA", "host": ["http://localhost:8089"], "path": ["api", "v1", "ordens-servico", "status", "RECEBIDA"]}}
+        },
+        {
+          "name": "Consultar historico de OS finalizadas",
+          "request": {"method": "GET", "description": "Consulta OS FINALIZADA que nao aparecem na fila operacional. Para entregues, substitua o status por ENTREGUE; os registros permanecem salvos.", "url": {"raw": "http://localhost:8089/api/v1/ordens-servico/status/FINALIZADA", "host": ["http://localhost:8089"], "path": ["api", "v1", "ordens-servico", "status", "FINALIZADA"]}}
         },
         {
           "name": "Listar OS por periodo",

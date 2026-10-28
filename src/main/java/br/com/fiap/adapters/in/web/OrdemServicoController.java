@@ -192,8 +192,10 @@ public class OrdemServicoController {
     }
 
     @Operation(
-        summary = "Listar todas as OS (administrativo)",
-        description = "Retorna uma lista com todas as ordens de serviço do sistema. Uso administrativo."
+        summary = "Listar fila operacional de OS",
+        description = "Retorna Execução, Aguardando Aprovação, Diagnóstico e Recebida, nessa prioridade. "
+                + "Dentro de cada status, as mais antigas vêm primeiro, com desempate por ID. "
+                + "Finalizadas e entregues são ocultadas apenas desta fila; o histórico continua nas consultas específicas."
     )
     @ApiResponses(value = {
         @ApiResponse(responseCode = "200", description = "Lista de OS retornada com sucesso")

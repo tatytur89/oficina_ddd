@@ -391,7 +391,7 @@ Base: `/api/v1/ordens-servico`
 | Método | Rota | Descrição |
 |---|---|---|
 | POST | `/api/v1/ordens-servico` | Criar OS |
-| GET | `/api/v1/ordens-servico` | Listar todas as OS (administrativo) |
+| GET | `/api/v1/ordens-servico` | Listar fila operacional de OS por prioridade e antiguidade |
 | GET | `/api/v1/ordens-servico/{id}` | Buscar OS por ID |
 | GET | `/api/v1/ordens-servico/cliente/{clienteId}` | Listar OS de um cliente |
 | GET | `/api/v1/ordens-servico/status/{status}` | Listar OS por status |
@@ -402,6 +402,19 @@ Base: `/api/v1/ordens-servico`
 | POST | `/api/v1/ordens-servico/{id}/servicos` | Adicionar um serviço à OS (exige `EM_DIAGNOSTICO`) |
 | POST | `/api/v1/ordens-servico/{id}/pecas` | Adicionar uma peça à OS (exige `EM_DIAGNOSTICO`) |
 | GET | `/api/v1/ordens-servico/metricas/tempo-medio-execucao` | Tempo médio de execução das OS finalizadas |
+
+### Fila operacional e histórico
+
+`GET /api/v1/ordens-servico` retorna apenas as OS em atendimento, nesta ordem de prioridade:
+
+1. `EM_EXECUCAO`
+2. `AGUARDANDO_APROVACAO`
+3. `EM_DIAGNOSTICO`
+4. `RECEBIDA`
+
+Dentro de cada status, as OS são ordenadas por data de abertura crescente (mais antigas primeiro), com ID crescente para desempatar datas iguais. `FINALIZADA` e `ENTREGUE` ficam fora dessa fila por filtro de consulta; nenhum registro é apagado ou alterado por essa listagem.
+
+O histórico continua disponível nas consultas por ID, cliente, status e período. Por exemplo, `GET /api/v1/ordens-servico/status/FINALIZADA` permite consultar OS finalizadas. A métrica de tempo médio também continua considerando as OS concluídas, independentemente do filtro da fila.
 
 A resposta autenticada da OS (criar, listar, buscar por ID) inclui o campo `chaveAcesso` — é essa chave que a equipe administrativa repassa ao cliente (não há integração de e-mail/SMS no projeto) para ele acessar a página pública de acompanhamento descrita abaixo.
 
