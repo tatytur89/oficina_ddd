@@ -234,7 +234,7 @@
       "name": "Ordem de Servico",
       "item": [
         {
-          "name": "Criar OS",
+          "name": "Criar OS com servicos e pecas solicitados",
           "event": [
             {
               "listen": "test",
@@ -250,16 +250,18 @@
           "request": {
             "method": "POST",
             "header": [{"key": "Content-Type", "value": "application/json"}],
-            "body": {"mode": "raw", "raw": "{\n  \"clienteId\": 1,\n  \"veiculoId\": 1,\n  \"observacoes\": \"Ruido no freio dianteiro\"\n}", "options": {"raw": {"language": "json"}}},
+            "description": "Cria a OS em RECEBIDA com snapshots e totais dos itens solicitados, sem previsao de entrega nem baixa de estoque. As listas servicos e pecas podem ser omitidas ou vazias. IDs devem existir no catalogo e quantidades devem ser positivas.",
+            "body": {"mode": "raw", "raw": "{\n  \"clienteId\": 1,\n  \"veiculoId\": 1,\n  \"observacoes\": \"Ruido no freio dianteiro\",\n  \"servicos\": [{\"servicoId\": 1, \"quantidade\": 1}],\n  \"pecas\": [{\"pecaId\": 1, \"quantidade\": 1}]\n}", "options": {"raw": {"language": "json"}}},
             "url": {"raw": "http://localhost:8089/api/v1/ordens-servico", "host": ["http://localhost:8089"], "path": ["api", "v1", "ordens-servico"]}
           }
         },
         {
-          "name": "Realizar diagnostico da OS",
+          "name": "Iniciar diagnostico preservando itens da abertura",
           "request": {
             "method": "POST",
             "header": [{"key": "Content-Type", "value": "application/json"}],
-            "body": {"mode": "raw", "raw": "{\n  \"servicos\": [{\n    \"servicoId\": 1,\n    \"quantidade\": 1\n  }],\n  \"pecas\": [{\n    \"pecaId\": 1,\n    \"quantidade\": 1\n  }],\n  \"dataPrevistaEntrega\": \"2026-08-30T18:00:00\"\n}", "options": {"raw": {"language": "json"}}},
+            "description": "Transiciona RECEBIDA para EM_DIAGNOSTICO e define a previsao. Listas vazias preservam os itens anteriores; itens enviados aqui sao acrescentados, sem substituir nem deduplicar os itens da abertura.",
+            "body": {"mode": "raw", "raw": "{\n  \"servicos\": [],\n  \"pecas\": [],\n  \"dataPrevistaEntrega\": \"2026-08-30T18:00:00\"\n}", "options": {"raw": {"language": "json"}}},
             "url": {"raw": "http://localhost:8089/api/v1/ordens-servico/1/diagnostico", "host": ["http://localhost:8089"], "path": ["api", "v1", "ordens-servico", "1", "diagnostico"]}
           }
         },

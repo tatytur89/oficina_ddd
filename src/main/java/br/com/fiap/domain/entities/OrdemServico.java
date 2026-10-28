@@ -4,6 +4,7 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.UUID;
 
 import br.com.fiap.domain.valueobjects.Preco;
 import br.com.fiap.domain.valueobjects.StatusOS;
@@ -50,6 +51,32 @@ public class OrdemServico {
         this.comentarioAvaliacao = comentarioAvaliacao;
     }
 
+    public static OrdemServico abrir(Long clienteId, Long veiculoId, String observacoes) {
+        if (clienteId == null || clienteId <= 0 || veiculoId == null || veiculoId <= 0) {
+            throw new IllegalArgumentException("Cliente e veículo devem ter IDs positivos.");
+        }
+        Preco zero = new Preco(BigDecimal.ZERO);
+        return new OrdemServico(null, clienteId, veiculoId, StatusOS.RECEBIDA, LocalDateTime.now(),
+                null, null, observacoes, zero, zero, zero, List.of(), List.of(),
+                UUID.randomUUID().toString(), null, null);
+    }
+
+    public void registrarServicoSolicitado(Servico servico, int quantidade) {
+        validarAbertura();
+        incluirServico(servico, quantidade);
+    }
+
+    public void registrarPecaSolicitada(Peca peca, int quantidade) {
+        validarAbertura();
+        incluirPeca(peca, quantidade);
+    }
+
+    private void validarAbertura() {
+        if (id != null || status != StatusOS.RECEBIDA) {
+            throw new IllegalStateException("Itens solicitados só podem ser registrados na abertura da OS.");
+        }
+    }
+
     public void definirDataPrevistaEntrega(LocalDateTime dataPrevistaEntrega) {
         this.dataPrevistaEntrega = dataPrevistaEntrega;
     }
@@ -58,6 +85,11 @@ public class OrdemServico {
         if (status != StatusOS.EM_DIAGNOSTICO) {
             throw new IllegalStateException("Não é possível adicionar serviços neste status.");
         }
+        incluirServico(servico, quantidade);
+    }
+
+    private void incluirServico(Servico servico, int quantidade) {
+        validarQuantidade(quantidade);
         Preco valorItem = servico.getPreco().multiplicar(quantidade);
         this.servicos.add(new ServicoOS(servico.getId(), servico.getNome(), quantidade, servico.getPreco(), valorItem));
         recalcularValores();
@@ -67,6 +99,11 @@ public class OrdemServico {
         if (status != StatusOS.EM_DIAGNOSTICO) {
             throw new IllegalStateException("Não é possível adicionar peças neste status.");
         }
+        incluirPeca(peca, quantidade);
+    }
+
+    private void incluirPeca(Peca peca, int quantidade) {
+        validarQuantidade(quantidade);
         Preco valorItem = peca.getPreco().multiplicar(quantidade);
         this.pecas.add(new PecaOS(peca.getId(), peca.getNome(), peca.getCodigo(), quantidade, peca.getPreco(), valorItem));
         recalcularValores();
@@ -80,6 +117,12 @@ public class OrdemServico {
             throw new IllegalStateException("A OS deve ter pelo menos um serviço para enviar orçamento.");
         }
         this.status = StatusOS.AGUARDANDO_APROVACAO;
+    }
+
+    private void validarQuantidade(int quantidade) {
+        if (quantidade <= 0) {
+            throw new IllegalArgumentException("A quantidade deve ser maior que zero.");
+        }
     }
 
     public void validarChaveAcesso(String chave) {

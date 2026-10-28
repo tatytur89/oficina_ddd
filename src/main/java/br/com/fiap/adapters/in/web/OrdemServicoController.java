@@ -52,12 +52,12 @@ public class OrdemServicoController {
     @Operation(
         summary = "Criar uma nova Ordem de Serviço",
         description = """
-            Cria uma nova OS no sistema, vinculando cliente e veículo. A OS nasce sem serviços/peças —
-            eles só podem ser adicionados depois que a OS entrar em diagnóstico (`EM_DIAGNOSTICO`),
-            via os endpoints `POST /{id}/servicos` e `POST /{id}/pecas`.
+            Cria uma nova OS vinculando cliente e veículo, com serviços e peças solicitados opcionais.
+            Os preços do catálogo são registrados e os totais calculados sem baixar estoque.
+            Itens adicionais podem ser incluídos durante o diagnóstico (`EM_DIAGNOSTICO`).
 
             **Fluxo inicial:**
-            - A OS é criada com status `RECEBIDA`, contendo só a observação do problema relatado
+            - A OS é criada com status `RECEBIDA`, observação e itens solicitados, sem previsão de entrega
             - Uma chave de acesso (`chaveAcesso`) é gerada para a página pública de acompanhamento do cliente
 
             **Máquina de estados:**
@@ -107,8 +107,7 @@ public class OrdemServicoController {
             )
             @Valid @RequestBody OrdemServicoCreateRequest requestDTO) {
 
-        OrdemServico osDomain = OrdemServicoMapper.toDomain(requestDTO);
-        OrdemServico osCriada = osUseCase.criarOS(osDomain);
+        OrdemServico osCriada = osUseCase.criarOS(OrdemServicoMapper.toCommand(requestDTO));
 
         return ResponseEntity.status(HttpStatus.CREATED).body(
                 new Response<>("success", "OS criada com sucesso", OrdemServicoMapper.toResponse(osCriada)));

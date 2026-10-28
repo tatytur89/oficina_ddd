@@ -1,10 +1,8 @@
 package br.com.fiap.application.services;
 
-import java.math.BigDecimal;
 import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.List;
-import java.util.UUID;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -14,7 +12,8 @@ import br.com.fiap.domain.entities.OrdemServico;
 import br.com.fiap.domain.entities.Peca;
 import br.com.fiap.domain.entities.PecaOS;
 import br.com.fiap.domain.entities.Servico;
-import br.com.fiap.domain.valueobjects.Preco;
+import br.com.fiap.domain.entities.Veiculo;
+import br.com.fiap.ports.in.CriarOrdemServicoCommand;
 import br.com.fiap.domain.valueobjects.StatusOS;
 import br.com.fiap.ports.in.ItemDiagnostico;
 import br.com.fiap.ports.in.OrdemServicoUseCase;
@@ -48,31 +47,23 @@ public class OrdemServicoService implements OrdemServicoUseCase {
 
     @Override
     @Transactional
-    public OrdemServico criarOS(OrdemServico os) {
-        clienteRepositoryPort.buscarPorId(os.getClienteId())
-                .orElseThrow(() -> new ResourceNotFoundException("Cliente não encontrado com ID: " + os.getClienteId()));
+    public OrdemServico criarOS(CriarOrdemServicoCommand command) {
+        clienteRepositoryPort.buscarPorId(command.clienteId())
+                .orElseThrow(() -> new ResourceNotFoundException("Cliente não encontrado com ID: " + command.clienteId()));
 
-        veiculoRepositoryPort.buscarPorId(os.getVeiculoId())
-                .orElseThrow(() -> new ResourceNotFoundException("Veículo não encontrado com ID: " + os.getVeiculoId()));
+        Veiculo veiculo = veiculoRepositoryPort.buscarPorId(command.veiculoId())
+                .orElseThrow(() -> new ResourceNotFoundException("Veículo não encontrado com ID: " + command.veiculoId()));
+        if (!command.clienteId().equals(veiculo.getClienteId())) {
+            throw new IllegalArgumentException("O veículo informado não pertence ao cliente da OS.");
+        }
 
-        OrdemServico novaOS = new OrdemServico(
-            null,
-            os.getClienteId(),
-            os.getVeiculoId(),
-            StatusOS.RECEBIDA,
-            LocalDateTime.now(),
-            null,
-            null,
-            os.getObservacoes(),
-            new Preco(BigDecimal.ZERO),
-            new Preco(BigDecimal.ZERO),
-            new Preco(BigDecimal.ZERO),
-            null,
-            null,
-            UUID.randomUUID().toString(),
-            null,
-            null
-        );
+        OrdemServico novaOS = OrdemServico.abrir(command.clienteId(), command.veiculoId(), command.observacoes());
+        for (ItemDiagnostico item : command.servicos()) {
+            novaOS.registrarServicoSolicitado(servicoUseCase.buscarPorId(item.id()), item.quantidade());
+        }
+        for (ItemDiagnostico item : command.pecas()) {
+            novaOS.registrarPecaSolicitada(pecaUseCase.buscarPorId(item.id()), item.quantidade());
+        }
 
         return osRepositoryPort.salvar(novaOS);
     }

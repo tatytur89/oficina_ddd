@@ -8,28 +8,16 @@ import br.com.fiap.adapters.in.web.DTO.OrdemServico.OrdemServicoResponse;
 import br.com.fiap.adapters.in.web.DTO.OrdemServico.RealizarDiagnosticoRequest;
 import br.com.fiap.domain.entities.OrdemServico;
 import br.com.fiap.ports.in.ItemDiagnostico;
+import br.com.fiap.ports.in.CriarOrdemServicoCommand;
 
 public class OrdemServicoMapper {
 
-    public static OrdemServico toDomain(OrdemServicoCreateRequest dto) {
-        return new OrdemServico(
-                null,
-                dto.clienteId(),
-                dto.veiculoId(),
-                null,
-                null,
-                null,
-                null,
-                dto.observacoes(),
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null
-        );
+    public static CriarOrdemServicoCommand toCommand(OrdemServicoCreateRequest dto) {
+        return new CriarOrdemServicoCommand(dto.clienteId(), dto.veiculoId(), dto.observacoes(),
+                dto.servicos() == null ? List.of() : dto.servicos().stream()
+                        .map(item -> new ItemDiagnostico(item.servicoId(), item.quantidade())).toList(),
+                dto.pecas() == null ? List.of() : dto.pecas().stream()
+                        .map(item -> new ItemDiagnostico(item.pecaId(), item.quantidade())).toList());
     }
 
     public static List<ItemDiagnostico> toItensServicoDiagnostico(RealizarDiagnosticoRequest dto) {

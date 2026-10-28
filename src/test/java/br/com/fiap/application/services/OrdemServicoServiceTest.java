@@ -17,6 +17,7 @@ import br.com.fiap.domain.valueobjects.Preco;
 import br.com.fiap.domain.valueobjects.StatusOS;
 import br.com.fiap.domain.valueobjects.TipoServico;
 import br.com.fiap.ports.in.ItemDiagnostico;
+import br.com.fiap.ports.in.CriarOrdemServicoCommand;
 import br.com.fiap.ports.in.PecaUseCase;
 import br.com.fiap.ports.in.ServicoUseCase;
 import br.com.fiap.ports.in.TempoMedioExecucao;
@@ -57,8 +58,8 @@ class OrdemServicoServiceTest {
     private static final Cliente CLIENTE = new Cliente(1L, "Robert", "12345678909", "robert@email.com", "11999999999");
     private static final Veiculo VEICULO = new Veiculo(1L, "Toyota", "Corolla", 2022, "ABC1D23", 1L);
 
-    private OrdemServico novaOSMinima() {
-        return new OrdemServico(null, 1L, 1L, null, null, null, null, "Barulho no freio", null, null, null, null, null, null, null, null);
+    private CriarOrdemServicoCommand novaOSMinima() {
+        return new CriarOrdemServicoCommand(1L, 1L, "Barulho no freio", List.of(), List.of());
     }
 
     private OrdemServico osComStatus(StatusOS status) {

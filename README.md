@@ -411,23 +411,29 @@ Exemplo de corpo (criar OS):
 {
   "clienteId": 1,
   "veiculoId": 1,
-  "observacoes": "Ruído no freio dianteiro"
+  "observacoes": "Ruído no freio dianteiro",
+  "servicos": [{ "servicoId": 1, "quantidade": 1 }],
+  "pecas": [{ "pecaId": 1, "quantidade": 1 }]
 }
 ```
 
-A OS nasce em `RECEBIDA` só com a observação do problema relatado — sem serviços/peças nem previsão de entrega ainda, já que essas informações só fazem sentido depois do diagnóstico (não dá pra estimar prazo antes de saber o que precisa ser feito). Depois, o diagnóstico pode ser registrado de duas formas:
+A abertura recebe IDs de cliente e veículo já cadastrados e pode incluir serviços e peças solicitados, com IDs de catálogo e quantidades positivas. As listas `servicos` e `pecas` são opcionais: podem ser omitidas ou enviadas vazias para manter o fluxo de abertura sem itens.
+
+A OS nasce em `RECEBIDA`, com identificação única e chave de acesso. Os itens informados são registrados com nome e preço do catálogo no momento da abertura, e os totais de serviços, peças e da OS são calculados automaticamente. A abertura não define previsão de entrega, não aprova o orçamento e não baixa estoque.
+
+O diagnóstico continua sendo uma etapa posterior. Ele preserva os itens da abertura e **acrescenta** os itens enviados, sem substituir nem deduplicar automaticamente os anteriores. Não reenvie os mesmos itens apenas para confirmá-los. Para iniciar o diagnóstico e definir a previsão sem acrescentar itens:
 
 ```json
 // POST /api/v1/ordens-servico/{id}/diagnostico
-// Transiciona para EM_DIAGNOSTICO, registra os itens e a previsão de entrega numa chamada só
+// Transiciona para EM_DIAGNOSTICO e define a previsão, preservando os itens da abertura
 {
-  "servicos": [{ "servicoId": 1, "quantidade": 1 }],
-  "pecas": [{ "pecaId": 1, "quantidade": 1 }],
+  "servicos": [],
+  "pecas": [],
   "dataPrevistaEntrega": "2026-08-30T18:00:00"
 }
 ```
 
-Ou, se preferir ajustar item a item (a OS já precisa estar em `EM_DIAGNOSTICO`, via `PATCH /{id}/status/EM_DIAGNOSTICO` ou pelo endpoint acima com listas vazias):
+Se o diagnóstico identificar itens adicionais, inclua-os nas listas dessa chamada ou adicione-os individualmente pelos endpoints abaixo. A adição individual exige `EM_DIAGNOSTICO`, alcançado por `PATCH /{id}/status/EM_DIAGNOSTICO` ou pelo endpoint de diagnóstico:
 
 ```json
 // POST /api/v1/ordens-servico/{id}/servicos
@@ -443,7 +449,7 @@ Ou, se preferir ajustar item a item (a OS já precisa estar em `EM_DIAGNOSTICO`,
 RECEBIDA → EM_DIAGNOSTICO → AGUARDANDO_APROVACAO → EM_EXECUCAO → FINALIZADA → ENTREGUE
 ```
 
-- Serviços e peças só podem ser adicionados à OS em `EM_DIAGNOSTICO`.
+- A abertura pode registrar serviços e peças solicitados enquanto cria a OS em `RECEBIDA`. Depois de criada, os endpoints de adição de itens exigem `EM_DIAGNOSTICO`.
 - `enviarOrcamento` exige a OS em `EM_DIAGNOSTICO` e pelo menos um serviço vinculado.
 - Ao transicionar para `EM_EXECUCAO`, o estoque de cada peça vinculada é baixado automaticamente.
 - Não há caminho de cancelamento — cada status só avança para o próximo da lista.
