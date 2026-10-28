@@ -160,7 +160,7 @@ module "database" {
   multi_az                         = var.database_multi_az
   backup_retention_period          = 7
   deletion_protection              = var.database_deletion_protection
-  skip_final_snapshot              = false
+  skip_final_snapshot              = var.database_skip_final_snapshot
   final_snapshot_identifier_prefix = "${local.name}-final"
   copy_tags_to_snapshot            = true
 

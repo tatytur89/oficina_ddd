@@ -87,3 +87,9 @@ variable "database_deletion_protection" {
   type        = bool
   default     = true
 }
+
+variable "database_skip_final_snapshot" {
+  description = "Não cria snapshot final ao destruir o RDS. Use true em ambientes temporários para evitar custo de armazenamento após o destroy."
+  type        = bool
+  default     = false
+}

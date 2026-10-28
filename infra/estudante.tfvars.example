@@ -1,0 +1,10 @@
+# Perfil para testes curtos (subir, testar e destruir no mesmo dia).
+# Copie para infra/terraform.tfvars e substitua o IP.
+# Mantém os nós padrão (2 a 3) para suportar a escalabilidade horizontal;
+# muda apenas o que impede o destroy limpo do banco.
+aws_region          = "sa-east-1"
+cluster_admin_cidrs = ["REPLACE_WITH_YOUR_PUBLIC_IP/32"]
+
+# Permite que o terraform destroy remova o RDS sem deixar snapshot cobrado.
+database_deletion_protection = false
+database_skip_final_snapshot = true
