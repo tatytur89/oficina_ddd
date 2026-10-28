@@ -118,6 +118,40 @@ SPRING_DATASOURCE_URL=jdbc:postgresql://localhost:5433/oficina_db ./mvnw spring-
 ./mvnw clean install
 ```
 
+## Deploy local no Kubernetes (kind)
+
+Para testar o deploy em Kubernetes sem AWS, `k8s/local/` reproduz os manifests de produção num cluster [kind](https://kind.sigs.k8s.io/) na sua máquina, com estas diferenças:
+
+- PostgreSQL roda no próprio cluster (`StatefulSet` com volume persistente), no lugar do RDS
+- A imagem `oficina-ddd:local` é construída localmente e carregada no kind (`imagePullPolicy: Never`), sem GHCR
+- O Service é `NodePort` mapeado para `localhost:8090`, no lugar do Ingress/ALB
+- O Secret tem valores de desenvolvimento (os mesmos do Docker Compose) e é versionado; não use esses valores fora do cluster local
+- `SPRING_JPA_HIBERNATE_DDL_AUTO=update` cria as tabelas no banco vazio
+- O HPA escala de 1 a 3 réplicas, com o metrics-server instalado pelo script
+
+O cluster usa Kubernetes 1.34, a mesma versão do EKS. A versão está fixada em `k8s/local/kind-config.yaml` porque o Kubernetes 1.35+ (padrão das versões recentes do kind) não sobe em hosts com cgroup v1.
+
+Pré-requisitos: Docker, [kind](https://kind.sigs.k8s.io/docs/user/quick-start/#installation), `kubectl` e Helm 3. Para subir (ou reimplantar após mudar o código):
+
+```bash
+./scripts/deploy-local.sh
+```
+
+- API: `http://localhost:8090`
+- Swagger: `http://localhost:8090/swagger-ui/index.html`
+
+Para acompanhar os recursos:
+
+```bash
+kubectl --context kind-oficina-local get pods,svc,hpa -n oficina-api
+```
+
+Para remover o cluster e os dados do banco:
+
+```bash
+./scripts/destroy-local.sh
+```
+
 ## Deploy no Kubernetes
 
 Os manifests em `k8s/` publicam a API usando um PostgreSQL externo. Para deploy automatizado, cada push em `main` que conclui o CI com sucesso dispara o workflow **CD Pipeline**, que publica a imagem com a tag `sha-<commit>` no GHCR e atualiza o Deployment. Configure o secret `KUBE_CONFIG` nas configurações do repositório com o conteúdo do kubeconfig. A imagem do GHCR precisa ser pública para que o cluster possa baixá-la.

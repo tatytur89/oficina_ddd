@@ -1,0 +1,11 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: oficina-api-config
+data:
+  SPRING_PROFILES_ACTIVE: docker
+  SERVER_PORT: "8080"
+  # O banco local começa vazio: o Hibernate cria/atualiza as tabelas
+  SPRING_JPA_HIBERNATE_DDL_AUTO: update
+  MANAGEMENT_ENDPOINT_HEALTH_PROBES_ENABLED: "true"
+  MANAGEMENT_ENDPOINT_HEALTH_GROUP_READINESS_INCLUDE: readinessState,db
