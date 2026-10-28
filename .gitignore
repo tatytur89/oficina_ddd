@@ -5,10 +5,10 @@ target/
 !**/src/test/**/target/
 /.github/agents/
 k8s/secret.yaml
-terraform/.terraform/
-terraform/addons/.terraform/
-terraform/terraform.tfvars
-terraform/addons/terraform.tfvars
+infra/.terraform/
+infra/addons/.terraform/
+infra/terraform.tfvars
+infra/addons/terraform.tfvars
 *.tfstate
 *.tfstate.*
 *.tfplan

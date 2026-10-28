@@ -132,27 +132,27 @@ O perfil `docker` está configurado com `spring.jpa.hibernate.ddl-auto=validate`
 
 ## Infraestrutura AWS com Terraform
 
-A configuração em `terraform/` cria uma VPC em duas zonas, EKS com nós privados, PostgreSQL RDS privado e criptografado com senha gerenciada pelo Secrets Manager, regras de rede e a role IAM do AWS Load Balancer Controller. O controller é instalado por uma segunda configuração Terraform em `terraform/addons/`, depois que o cluster já existe; isso evita inicializar o provider Kubernetes antes do EKS estar disponível.
+A configuração em `infra/` cria uma VPC em duas zonas, EKS com nós privados, PostgreSQL RDS privado e criptografado com senha gerenciada pelo Secrets Manager, regras de rede e a role IAM do AWS Load Balancer Controller. O controller é instalado por uma segunda configuração Terraform em `infra/addons/`, depois que o cluster já existe; isso evita inicializar o provider Kubernetes antes do EKS estar disponível.
 
 Você precisa de Terraform 1.5+, AWS CLI, `kubectl`, Helm 3 e credenciais AWS com permissões para criar EKS, VPC, RDS, IAM e Secrets Manager. Configure o perfil AWS e copie o exemplo de variáveis no PowerShell:
 
 ```powershell
-Copy-Item terraform\terraform.tfvars.example terraform\terraform.tfvars
+Copy-Item infra\terraform.tfvars.example infra\terraform.tfvars
 ```
 
-Edite `terraform/terraform.tfvars`, substituindo `REPLACE_WITH_YOUR_PUBLIC_IP/32` pelo seu IP público e escolhendo região/valores apropriados. O CIDR `0.0.0.0/0` é rejeitado para proteger o endpoint público do EKS. Em seguida:
+Edite `infra/terraform.tfvars`, substituindo `REPLACE_WITH_YOUR_PUBLIC_IP/32` pelo seu IP público e escolhendo região/valores apropriados. O CIDR `0.0.0.0/0` é rejeitado para proteger o endpoint público do EKS. Em seguida:
 
 ```powershell
-terraform -chdir=terraform init
-terraform -chdir=terraform plan
-terraform -chdir=terraform apply
-$region = terraform -chdir=terraform output -raw aws_region
-$cluster = terraform -chdir=terraform output -raw cluster_name
+terraform -chdir=infra init
+terraform -chdir=infra plan
+terraform -chdir=infra apply
+$region = terraform -chdir=infra output -raw aws_region
+$cluster = terraform -chdir=infra output -raw cluster_name
 aws eks update-kubeconfig --region $region --name $cluster
-terraform -chdir=terraform/addons init
-$vpc = terraform -chdir=terraform output -raw vpc_id
-$controllerRole = terraform -chdir=terraform output -raw aws_load_balancer_controller_role_arn
-terraform -chdir=terraform/addons apply `
+terraform -chdir=infra/addons init
+$vpc = terraform -chdir=infra output -raw vpc_id
+$controllerRole = terraform -chdir=infra output -raw aws_load_balancer_controller_role_arn
+terraform -chdir=infra/addons apply `
   -var="aws_region=$region" `
   -var="cluster_name=$cluster" `
   -var="vpc_id=$vpc" `
@@ -161,7 +161,7 @@ kubectl create namespace oficina-api
 Copy-Item k8s\secret.yaml.example k8s\secret.yaml
 ```
 
-Abra no AWS Secrets Manager o ARN exibido por `terraform -chdir=terraform output -raw database_master_secret_arn` e copie a senha gerenciada pelo RDS para `SPRING_DATASOURCE_PASSWORD` em `k8s/secret.yaml`. Preencha também `SPRING_DATASOURCE_URL` usando o endpoint de `terraform -chdir=terraform output -raw database_endpoint`, e defina valores fortes para `JWT_SECRET`, `ADMIN_USER` e `ADMIN_PASSWORD`. Depois aplique os manifests:
+Abra no AWS Secrets Manager o ARN exibido por `terraform -chdir=infra output -raw database_master_secret_arn` e copie a senha gerenciada pelo RDS para `SPRING_DATASOURCE_PASSWORD` em `k8s/secret.yaml`. Preencha também `SPRING_DATASOURCE_URL` usando o endpoint de `terraform -chdir=infra output -raw database_endpoint`, e defina valores fortes para `JWT_SECRET`, `ADMIN_USER` e `ADMIN_PASSWORD`. Depois aplique os manifests:
 
 ```powershell
 kubectl apply -n oficina-api -f k8s\
