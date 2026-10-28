@@ -21,51 +21,78 @@ O projeto segue arquitetura hexagonal (ports & adapters) com Domain-Driven Desig
 
 O PostgreSQL foi escolhido por ser um banco relacional maduro, open-source, com suporte nativo e bem documentado no ecossistema Spring Data JPA. O domínio da oficina é fortemente relacional (cliente → veículo → ordem de serviço → peças/serviços, com chaves estrangeiras e integridade referencial reforçada na camada de aplicação), o que se encaixa melhor num modelo relacional do que num banco não-relacional. O PostgreSQL também tem excelente suporte a tipos numéricos precisos (`NUMERIC`), importante para valores monetários, e é o banco padrão de fato em ambientes de produção Java/Spring, o que reduz o custo de operação e manutenção.
 
-## Pré-requisitos
+## Executar localmente
 
-Antes de rodar o projeto, certifique-se de ter instalado:
+### Pré-requisitos
 
-- Java 21 JDK
 - Git
+- Docker com o plugin Compose (`docker compose version`)
+- Java 21 JDK (`java -version` deve mostrar 21.x) — necessário apenas para rodar com Maven ou executar os testes
 
-### Verificando a instalação do Java
-
-No terminal, execute:
+No Linux, se o Docker retornar `permission denied ... docker.sock`, adicione seu usuário ao grupo `docker` e abra uma nova sessão (ou rode `newgrp docker`):
 
 ```bash
-java -version
+sudo usermod -aG docker $USER
 ```
 
-Você deve ver uma versão 21.x.
-
-## Começando
-
-Clone o repositório e entre na pasta do projeto:
+### Clonar o repositório
 
 ```bash
 git clone https://github.com/robert-portilho/oficina-ddd
-git cd oficina-ddd
-```
-
-Se necessário, conceda permissão de execução ao Maven Wrapper:
-
-```bash
+cd oficina-ddd
 chmod +x mvnw
 ```
 
-## Comandos principais
+### Banco de dados
 
-### Executar a aplicação
+O perfil local usa `spring.jpa.hibernate.ddl-auto=update`: ao subir, o Hibernate cria/atualiza as tabelas automaticamente em um banco vazio. O Docker Compose aplica o mesmo comportamento via `SPRING_JPA_HIBERNATE_DDL_AUTO=update`. Em Kubernetes/AWS o perfil `docker` continua com `validate` (veja [Deploy no Kubernetes](#deploy-no-kubernetes)).
+
+Ao iniciar, a aplicação cria o usuário administrador padrão `admin` / `admin123` (configurável pelas variáveis `ADMIN_USER` e `ADMIN_PASSWORD`).
+
+### Opção 1: Docker Compose (aplicação + PostgreSQL)
 
 ```bash
+docker compose up --build
+```
+
+- API: `http://localhost:8089`
+- Swagger: `http://localhost:8089/swagger-ui/index.html`
+- PostgreSQL: `localhost:5432` (banco `oficina_db`, usuário `oficina_user`, senha `password123`)
+
+Para parar (adicione `-v` para apagar também os dados do banco):
+
+```bash
+docker compose down
+```
+
+### Opção 2: Maven (aplicação na máquina, PostgreSQL no Docker)
+
+Suba apenas o banco e depois a aplicação:
+
+```bash
+docker compose up -d postgres
 ./mvnw spring-boot:run
 ```
 
-A aplicação ficará disponível em:
+- API: `http://localhost:8080`
+- Swagger: `http://localhost:8080/swagger-ui/index.html`
 
-```text
-http://localhost:8080
+A aplicação espera o PostgreSQL em `localhost:5432` com as credenciais acima (veja `src/main/resources/application.properties`).
+
+### Porta 5432 ocupada
+
+Se já houver outro PostgreSQL usando a porta 5432, o Compose falha ao publicar o banco (ou a aplicação via Maven conecta no banco errado e retorna `password authentication failed for user "oficina_user"`). Pare o outro PostgreSQL ou altere a porta publicada em `docker-compose.yaml` para `"5433:5432"`; nesse caso, ao rodar via Maven, informe a nova porta:
+
+```bash
+SPRING_DATASOURCE_URL=jdbc:postgresql://localhost:5433/oficina_db ./mvnw spring-boot:run
 ```
+
+### Testar a API
+
+1. Autentique com `POST /api/v1/auth/login` usando `admin` / `admin123` (veja [Autenticação](#autenticação)).
+2. Use o token no Swagger (`Authorize`) ou importe a coleção `postman/Oficina-DDD.postman_collection.json` no Postman ou no Bruno (`Import Collection → Postman Collection`). A coleção aponta para `http://localhost:8089` (Docker Compose); ao rodar via Maven, troque para a porta `8080`.
+
+## Comandos Maven
 
 ### Executar testes
 
@@ -89,20 +116,6 @@ http://localhost:8080
 
 ```bash
 ./mvnw clean install
-```
-
-## Executar com Docker Compose
-
-Para subir a aplicação e o banco PostgreSQL via Docker Compose:
-
-```bash
-docker compose up --build
-```
-
-A aplicação estará disponível em:
-
-```text
-http://localhost:8089
 ```
 
 ## Deploy no Kubernetes
@@ -180,7 +193,8 @@ Por padrão, a configuração usa nós `t3.medium`, RDS `db.t4g.micro`, um NAT G
 A documentação interativa da API pode ser acessada em:
 
 ```text
-http://localhost:8080/swagger-ui/index.html
+http://localhost:8080/swagger-ui/index.html   (Maven)
+http://localhost:8089/swagger-ui/index.html   (Docker Compose)
 ```
 
 ## Formato padrão de resposta
