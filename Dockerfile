@@ -20,8 +20,9 @@ FROM eclipse-temurin:21.0.11_10-jre-alpine
 WORKDIR /app
 
 # Cria um usuário do sistema para evitar rodar a aplicação como root
-RUN addgroup -S spring && adduser -S spring -G spring
-USER spring:spring
+# UID/GID numéricos permitem ao Kubernetes validar runAsNonRoot
+RUN addgroup -S -g 1001 spring && adduser -S -u 1001 -G spring spring
+USER 1001:1001
 
 ENV SPRING_PROFILES_ACTIVE=docker
 
