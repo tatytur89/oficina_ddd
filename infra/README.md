@@ -10,6 +10,6 @@ As raízes são independentes. O Terraform não carrega automaticamente configur
 
 A raiz AWS permaneceu em `infra/` para preservar os caminhos e estados existentes. Não é necessário mover nem migrar um estado AWS para preparar o laboratório local.
 
-Em `infra/local/`, esta etapa define apenas versão mínima e backend local. A criação do cluster será implementada na próxima etapa; não existem recursos ou providers AWS nesse diretório. Validar uma configuração vazia não comprova criação de cluster.
+Em `infra/local/`, o Terraform cria um cluster kind com um control plane e um worker, usando Docker local e kubeconfig dedicado. Consulte [as instruções do laboratório](local/README.md). Essa raiz não usa providers ou recursos AWS.
 
 Estados, variáveis reais e arquivos gerados não devem ser versionados. Não execute `apply` ou `destroy` na raiz AWS para validar a configuração local.

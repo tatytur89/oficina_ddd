@@ -175,7 +175,15 @@ try {
     Assert-Check ($localTerraformContent -match 'backend\s+"local"') 'Local Terraform state uses a local backend'
     foreach ($file in $localTerraform) {
         $hcl = Get-Content -LiteralPath $file.FullName -Raw
-        Assert-Check ($hcl -notmatch '(?m)^\s*(resource|module|data)\s+"' -and $hcl -notmatch '(?m)^\s*(provider\s+"aws"|backend\s+"s3")') 'Stage 2 local Terraform declares no infrastructure or AWS backend'
+        Assert-Check ($hcl -notmatch '(?m)^\s*(provider\s+"aws"|backend\s+"(?:s3|remote)"|cloud\s*\{)' -and
+                $hcl -notmatch 'source\s*=\s*"hashicorp/aws"') 'Local Terraform has no AWS provider or remote backend'
+        foreach ($resource in [regex]::Matches($hcl, '(?m)^\s*resource\s+"([^"]+)"')) {
+            Assert-Check ($resource.Groups[1].Value -in @('kind_cluster', 'terraform_data')) 'Local Terraform resources are restricted to the local cluster lifecycle'
+        }
+        foreach ($module in [regex]::Matches($hcl, '(?ms)^\s*module\s+"[^"]+"\s*\{(.*?)^\}')) {
+            $source = [regex]::Match($module.Groups[1].Value, 'source\s*=\s*"([^"]+)"').Groups[1].Value
+            Assert-Check ($source.StartsWith('./') -or $source.StartsWith('../')) 'Local Terraform cannot load remote modules'
+        }
     }
 } finally {
     $after = Get-ExternalState

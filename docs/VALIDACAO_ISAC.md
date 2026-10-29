@@ -70,3 +70,23 @@ Resultados: **438 testes Java aprovados**, incluindo **18 testes de resolução 
 As verificações de isolamento renderizam os dois ambientes em cópia temporária, comprovam falha local sem arquivo de configuração do Secret e reproduzem o patch do CD para confirmar que o SHA testado sobrevive à transformação Kustomize. Conferem nomes, namespaces, referências de Secret/ConfigMap, Compose, exclusão de arquivos sensíveis e preservação de contextos, configurações e containers existentes.
 
 Não houve `apply`, criação de cluster/banco/container ou execução de API AWS nesta etapa. O Terraform local ainda não provisiona recursos; sua validação não comprova funcionamento de cluster. A configuração AWS foi revisada e renderizada, sem homologação de deploy no EKS. Dependency-Check continuou desativado no comando Maven.
+
+## Cluster Kubernetes local — 29/10/2026
+
+A raiz `infra/local/` provisiona kind por `terraform_data` e CLI 0.33.0, com um control plane e um worker Kubernetes 1.34.11. A imagem é fixada por digest; API e portas reservadas para Ingress são publicadas somente em loopback. O kubeconfig fica isolado em `.generated/`, sem alterar o contexto padrão.
+
+Validações executadas:
+
+```powershell
+terraform -chdir=infra/local fmt -check -recursive
+terraform -chdir=infra/local validate
+powershell.exe -NoProfile -ExecutionPolicy RemoteSigned -File scripts/tests/Test-EnvironmentSeparation.ps1
+powershell.exe -NoProfile -ExecutionPolicy RemoteSigned -File scripts/tests/Test-LocalCluster.ps1
+powershell.exe -NoProfile -ExecutionPolicy RemoteSigned -File scripts/tests/Test-LocalClusterGuards.ps1
+```
+
+Resultados: **65 verificações de separação**, **43 verificações do ciclo real do cluster** e **26 verificações simuladas de proteção**, aprovadas. O cluster temporário foi removido, seu estado ficou sem recursos e os containers/configurações alheios permaneceram inalterados. O ciclo real comprovou criação, dois nós Ready, API pronta, plano sem alterações, recusa de remoção sem propriedade, recusa de IDs desconhecidos e detecção de um worker removido fora do Terraform.
+
+Os testes simulados comprovaram recusa de Engine diferente e endpoints remotos, serialização de criações concorrentes entre raízes, uso obrigatório do provider Docker, preservação de containers não comprovados após falha e limpeza de nós cuja criação teve sucesso e propriedade registrada.
+
+O cluster de desenvolvimento `oficina-local` foi criado e verificado separadamente. Não foram provisionados recursos AWS, banco, aplicação, Ingress ou HPA. Os testes Java não foram repetidos nesta alteração de infraestrutura; os 438 testes da etapa anterior permanecem como evidência da aplicação. Um plano Terraform vazio não detecta drift externo deste recurso; a verificação operacional explícita continua obrigatória, conforme `infra/local/README.md`.

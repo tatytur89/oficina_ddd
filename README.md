@@ -30,7 +30,7 @@ O código da aplicação é compartilhado. As configurações de desenvolvimento
 
 `k8s/base/` contém apenas os recursos comuns. Escolha `k8s/local` ou `k8s/aws` ao renderizar/aplicar; não aplique a pasta raiz recursivamente. Os perfis `lab` e `aws` exigem credenciais externas e validam o schema. Os valores padrão de desenvolvimento ficam restritos aos perfis locais.
 
-A separação local está preparada para as próximas etapas: ainda é necessário implementar o provisionamento do cluster, banco e deploy locais. Renderizar os manifests não comprova que a infraestrutura está em execução. Consulte [as configurações Kubernetes](k8s/README.md) e [as raízes Terraform](infra/README.md).
+O cluster local é provisionado por [Terraform e kind](infra/local/README.md). Banco e deploy locais serão preparados nas próximas etapas. Renderizar os manifests não comprova que a infraestrutura está em execução. Consulte também [as configurações Kubernetes](k8s/README.md) e [as raízes Terraform](infra/README.md).
 
 ## Por que PostgreSQL
 
