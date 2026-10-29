@@ -30,7 +30,7 @@ O código da aplicação é compartilhado. As configurações de desenvolvimento
 
 `k8s/base/` contém apenas os recursos comuns. Escolha `k8s/local` ou `k8s/aws` ao renderizar/aplicar; não aplique a pasta raiz recursivamente. Os perfis `lab` e `aws` exigem credenciais externas e validam o schema. Os valores padrão de desenvolvimento ficam restritos aos perfis locais.
 
-O cluster local é provisionado por [Terraform e kind](infra/local/README.md). Banco e deploy locais serão preparados nas próximas etapas. Renderizar os manifests não comprova que a infraestrutura está em execução. Consulte também [as configurações Kubernetes](k8s/README.md) e [as raízes Terraform](infra/README.md).
+O cluster local é provisionado por [Terraform e kind](infra/local/README.md). O [PostgreSQL e suas migrações](infra/local/database/README.md) usam uma raiz Terraform independente. O deploy local da aplicação será preparado na próxima etapa. Renderizar os manifests não comprova que a infraestrutura está em execução. Consulte também [as configurações Kubernetes](k8s/README.md) e [as raízes Terraform](infra/README.md).
 
 ## Por que PostgreSQL
 
@@ -91,7 +91,7 @@ Essa verificação prepara as ferramentas, mas não cria o cluster, não provisi
 
 ### Banco de dados
 
-O perfil `local` usa `spring.jpa.hibernate.ddl-auto=update`: ao subir, o Hibernate cria/atualiza as tabelas em um banco vazio. O perfil `docker` mantém esse comportamento para desenvolvimento com Compose. Os perfis `lab` e `aws` usam `validate` e exigem preparação prévia do schema (veja [Deploy no Kubernetes](#deploy-no-kubernetes)).
+O perfil `local` usa `spring.jpa.hibernate.ddl-auto=update`: ao subir, o Hibernate cria/atualiza as tabelas em um banco vazio. O perfil `docker` mantém esse comportamento para desenvolvimento com Compose. Os perfis `lab` e `aws` usam `validate` e exigem preparação prévia do schema. No laboratório, siga [PostgreSQL e migrações](infra/local/database/README.md); o Terraform executa o SQL versionado antes do deploy. Para AWS, veja [Deploy no Kubernetes](#deploy-no-kubernetes).
 
 Ao iniciar, a aplicação cria o usuário administrador padrão `admin` / `admin123` (configurável pelas variáveis `ADMIN_USER` e `ADMIN_PASSWORD`).
 
@@ -173,7 +173,7 @@ Copy-Item k8s/local/secret.env.example k8s/local/secret.env
 kubectl kustomize k8s/local
 ```
 
-`secret.env` é ignorado pelo Git. A saída renderizada contém os valores do Secret codificados; não a publique. Esse comando não acessa o cluster e não realiza deploy. Banco, imagem carregada no kind e componentes de entrada/escala serão preparados nas etapas seguintes.
+`secret.env` é ignorado pelo Git. A saída renderizada contém os valores do Secret codificados; não a publique. Esse comando não acessa o cluster e não realiza deploy. Prepare o banco com [sua raiz Terraform](infra/local/database/README.md) e mantenha as credenciais iguais às do Secret da aplicação. Imagem carregada no kind e componentes de entrada/escala serão preparados nas etapas seguintes.
 
 ## Deploy no Kubernetes
 

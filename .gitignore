@@ -11,6 +11,8 @@ k8s/local/secret.env
 infra/.terraform/
 infra/addons/.terraform/
 infra/local/.terraform/
+infra/local/database/.terraform/
+infra/local/database/terraform.tfvars
 infra/local/.generated/
 infra/terraform.tfvars
 infra/addons/terraform.tfvars

@@ -90,3 +90,25 @@ Resultados: **65 verificações de separação**, **43 verificações do ciclo r
 Os testes simulados comprovaram recusa de Engine diferente e endpoints remotos, serialização de criações concorrentes entre raízes, uso obrigatório do provider Docker, preservação de containers não comprovados após falha e limpeza de nós cuja criação teve sucesso e propriedade registrada.
 
 O cluster de desenvolvimento `oficina-local` foi criado e verificado separadamente. Não foram provisionados recursos AWS, banco, aplicação, Ingress ou HPA. Os testes Java não foram repetidos nesta alteração de infraestrutura; os 438 testes da etapa anterior permanecem como evidência da aplicação. Um plano Terraform vazio não detecta drift externo deste recurso; a verificação operacional explícita continua obrigatória, conforme `infra/local/README.md`.
+
+## PostgreSQL local e migrações — 29/10/2026
+
+A raiz independente `infra/local/database/` provisiona PostgreSQL 18.4 por provider Kubernetes, com StatefulSet, Service interno, Secret, PVC retido e Job de migração. SQL versionado e runner criam as oito tabelas JPA, incluindo decisão e versão do orçamento. O perfil `lab` continua com Hibernate `validate`, sem criação automática de schema.
+
+Validações executadas:
+
+```powershell
+terraform -chdir=infra/local/database fmt -check
+terraform -chdir=infra/local/database validate
+powershell.exe -NoProfile -ExecutionPolicy RemoteSigned -File scripts/tests/Test-EnvironmentSeparation.ps1
+powershell.exe -NoProfile -ExecutionPolicy RemoteSigned -File scripts/tests/Test-LocalDatabase.ps1
+./mvnw.cmd clean verify '-Ddependency-check.skip=true' -B
+```
+
+Resultados: **70 verificações de isolamento**, **40 verificações reais do banco** e **3 testes JUnit contra PostgreSQL real** aprovados. A suíte completa posterior passou com **438 testes executados** e **3 testes PostgreSQL opt-in ignorados**, já aprovados na execução dedicada; nenhum erro ou falha. Build, pacote e gate de cobertura aprovados, com **97,60% de cobertura de linhas** no escopo configurado. Dependency-Check permaneceu desativado.
+
+O teste independente criou namespace temporário exclusivo, verificou autenticação válida/inválida pelo Service, aplicação inicial e reexecução sem alterar histórico, rejeição de checksum alterado e rollback de DDL/histórico após SQL inválido. A linha sentinela persistiu após recriar o pod. O Hibernate validou todas as entidades contra o schema migrado; round-trip de OS/itens/estoque e unicidade de documento foram exercitados sem iniciar aplicação ou servidor web.
+
+O destroy do banco preservou namespace e PVC Bound. A limpeza posterior removeu somente o namespace criado pelo teste, após conferir seu UID. Nove snapshots externos permaneceram iguais. O banco de desenvolvimento em `oficina-local` permaneceu ativo, com PVC Bound, Job concluído e plano Terraform sem alterações.
+
+Não houve deploy da aplicação, Ingress, HPA ou recursos AWS. O armazenamento é local ao nó kind: excluir PVC/namespace ou substituir o cluster perde dados. Rotação automática de senha e adoção de banco existente não são implementadas; os procedimentos e limites estão em `infra/local/database/README.md`.

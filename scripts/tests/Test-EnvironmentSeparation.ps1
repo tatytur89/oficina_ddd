@@ -161,11 +161,12 @@ try {
     Assert-Check ($workflow -match 'k8s/aws' -and $workflow -notmatch 'k8s/local') 'CD targets only the AWS overlay'
     Assert-Check ($workflow -match 'set image' -and $workflow -match 'sha-' -and $workflow -match 'head_sha') 'CD keeps image replacement tied to the tested commit'
 
-    foreach ($path in @('k8s/local/secret.env', 'k8s/aws/secret.yaml', 'infra/local/terraform.tfstate', 'infra/local/terraform.tfvars', 'infra/local/.terraform/providers/placeholder')) {
+    foreach ($path in @('k8s/local/secret.env', 'k8s/aws/secret.yaml', 'infra/local/terraform.tfstate', 'infra/local/terraform.tfvars', 'infra/local/.terraform/providers/placeholder',
+            'infra/local/database/terraform.tfstate', 'infra/local/database/terraform.tfvars', 'infra/local/database/.terraform/providers/placeholder', 'infra/local/database/database.tfplan')) {
         $ignored = Invoke-Native 'git' @('check-ignore', '--no-index', $path)
         Assert-Check ($ignored.Code -eq 0) "Sensitive or generated path is ignored: $path"
     }
-    foreach ($path in @('k8s/local/secret.env.example', 'k8s/aws/secret.yaml.example')) {
+    foreach ($path in @('k8s/local/secret.env.example', 'k8s/aws/secret.yaml.example', 'infra/local/database/terraform.tfvars.example')) {
         $ignored = Invoke-Native 'git' @('check-ignore', '--no-index', $path)
         Assert-Check ($ignored.Code -eq 1) "Reviewable example remains versionable: $path"
     }
