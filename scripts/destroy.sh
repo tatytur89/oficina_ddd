@@ -45,8 +45,13 @@ fi
 if aws eks describe-cluster --region "$REGION" --name "$CLUSTER" >/dev/null 2>&1; then
   echo
   echo "==> Removendo Ingress (o controller apaga o ALB)"
-  aws eks update-kubeconfig --region "$REGION" --name "$CLUSTER" >/dev/null
-  kubectl delete ingress --all -n "$NAMESPACE" --ignore-not-found --wait=true --timeout=180s || true
+  AWS_CONTEXT="oficina-aws-$CLUSTER"
+  AWS_KUBECONFIG="$(mktemp)"
+  trap 'rm -f "$AWS_KUBECONFIG"' EXIT
+  aws eks update-kubeconfig --region "$REGION" --name "$CLUSTER" \
+    --alias "$AWS_CONTEXT" --kubeconfig "$AWS_KUBECONFIG" >/dev/null
+  kubectl --kubeconfig "$AWS_KUBECONFIG" --context "$AWS_CONTEXT" \
+    delete ingress oficina-api -n "$NAMESPACE" --ignore-not-found --wait=true --timeout=180s || true
 
   echo "==> Aguardando o ALB ser removido"
   for _ in $(seq 1 30); do

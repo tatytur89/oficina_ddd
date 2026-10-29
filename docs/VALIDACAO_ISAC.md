@@ -23,7 +23,7 @@ Comando final:
 
 No Windows, o comando equivalente usa `mvnw.cmd` e Java 21. Também foi executado `clean verify` antes do commit de aprovação/recusa.
 
-Resultado final: **420 testes, zero falhas, zero erros e nenhum ignorado**. Pacote gerado e gate JaCoCo aprovado. Cobertura no escopo configurado do relatório: **97,60% das linhas (1502/1539)** e **84,15% dos branches (292/347)**.
+Resultado da implementação funcional em 28/10/2026: **420 testes, zero falhas, zero erros e nenhum ignorado**. Pacote gerado e gate JaCoCo aprovado. Cobertura no escopo configurado do relatório: **97,60% das linhas (1502/1539)** e **84,15% dos branches (292/347)**.
 
 Cobertura funcional inclui:
 
@@ -44,3 +44,29 @@ Cobertura funcional inclui:
 - Antes do rollout em banco PostgreSQL existente com `ddl-auto=validate`, aplicar `docs/sql/orcamento-decisao.sql`. É atualização incremental de duas colunas, não criação do schema inicial ou automação do banco.
 - O lock serializa alterações da mesma OS. Controle de concorrência de estoque entre OS diferentes continua como pendência separada.
 - As listas de itens na abertura são opcionais para compatibilidade. O diagnóstico acrescenta itens; reenviar os já solicitados os duplica, conforme documentado no README.
+
+## Separação dos ambientes local e AWS — 29/10/2026
+
+Configuração Kubernetes compartilhada em `k8s/base/`, com ambientes explícitos em `k8s/local/` e `k8s/aws/`. O Terraform AWS manteve a raiz existente; `infra/local/` possui backend local independente, ainda sem recursos de cluster. Os perfis Spring foram separados entre desenvolvimento (`local`/`docker`) e ambientes com configuração externa obrigatória (`lab`/`aws`).
+
+Validações executadas:
+
+```bash
+./mvnw clean verify -Ddependency-check.skip=true -B
+terraform -chdir=infra/local fmt -check
+terraform -chdir=infra/local init -backend=false -input=false
+terraform -chdir=infra/local validate
+bash -n scripts/destroy.sh
+```
+
+No Windows, as verificações de isolamento dos arquivos podem ser repetidas em PowerShell com Docker e kubectl disponíveis no PATH:
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy RemoteSigned -File scripts/tests/Test-EnvironmentSeparation.ps1
+```
+
+Resultados: **438 testes Java aprovados**, incluindo **18 testes de resolução real dos perfis**, e **61 verificações de isolamento aprovadas**. Pacote e gate de cobertura aprovados; cobertura de linhas permanece em 97,60% no escopo configurado.
+
+As verificações de isolamento renderizam os dois ambientes em cópia temporária, comprovam falha local sem arquivo de configuração do Secret e reproduzem o patch do CD para confirmar que o SHA testado sobrevive à transformação Kustomize. Conferem nomes, namespaces, referências de Secret/ConfigMap, Compose, exclusão de arquivos sensíveis e preservação de contextos, configurações e containers existentes.
+
+Não houve `apply`, criação de cluster/banco/container ou execução de API AWS nesta etapa. O Terraform local ainda não provisiona recursos; sua validação não comprova funcionamento de cluster. A configuração AWS foi revisada e renderizada, sem homologação de deploy no EKS. Dependency-Check continuou desativado no comando Maven.

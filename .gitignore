@@ -5,10 +5,16 @@ target/
 !**/src/test/**/target/
 /.github/agents/
 k8s/secret.yaml
+k8s/aws/secret.yaml
+k8s/aws/deployment-image-patch.yaml
+k8s/local/secret.env
 infra/.terraform/
 infra/addons/.terraform/
+infra/local/.terraform/
+infra/local/.generated/
 infra/terraform.tfvars
 infra/addons/terraform.tfvars
+infra/local/terraform.tfvars
 *.tfstate
 *.tfstate.*
 *.tfplan

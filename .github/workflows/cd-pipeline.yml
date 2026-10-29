@@ -75,22 +75,18 @@ jobs:
       - name: Verify Kubernetes application secret exists
         run: kubectl get secret oficina-api-secret --namespace "$NAMESPACE"
 
-      - name: Apply Kubernetes manifests
-        run: |
-          kubectl apply --namespace "$NAMESPACE" \
-            -f k8s/configmap.yaml \
-            -f k8s/service.yaml \
-            -f k8s/ingress.yaml \
-            -f k8s/hpa.yaml
-
-      - name: Apply Deployment with tested image
+      - name: Apply AWS manifests with tested image
         env:
           IMAGE: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:sha-${{ github.event.workflow_run.head_sha }}
         run: |
-          kubectl set image --local=true -f k8s/deployment.yaml \
+          kubectl set image --local=true -f k8s/base/deployment.yaml \
             oficina-api="$IMAGE" \
-            -o yaml |
-            kubectl apply --namespace "$NAMESPACE" -f -
+            -o yaml > k8s/aws/deployment-image-patch.yaml
+          cat >> k8s/aws/kustomization.yaml <<'PATCH'
+          patches:
+            - path: deployment-image-patch.yaml
+          PATCH
+          kubectl apply --namespace "$NAMESPACE" -k k8s/aws
           kubectl rollout status deployment/oficina-api \
             --namespace "$NAMESPACE" \
             --timeout=180s

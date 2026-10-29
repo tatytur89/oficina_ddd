@@ -16,7 +16,7 @@ spec:
       terminationGracePeriodSeconds: 30
       containers:
         - name: oficina-api
-          image: ghcr.io/tatytur89/oficina_ddd:latest
+          image: oficina-ddd:unconfigured
           imagePullPolicy: IfNotPresent
           ports:
             - name: http

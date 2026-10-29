@@ -17,6 +17,21 @@ O projeto segue arquitetura hexagonal (ports & adapters) com Domain-Driven Desig
 - `adapters/out/persistence` — adaptadores JPA/PostgreSQL
 - `adapters/out/security` — autenticação JWT
 
+## Ambientes de execução
+
+O código da aplicação é compartilhado. As configurações de desenvolvimento, laboratório local e AWS são selecionadas explicitamente:
+
+| Ambiente | Perfil Spring | Configuração da infraestrutura |
+|---|---|---|
+| Maven na máquina | `local` (padrão) | PostgreSQL em localhost |
+| Docker Compose | `docker`, com configurações locais | `docker-compose.yaml` |
+| Kubernetes local | `lab` | `k8s/local/` e raiz Terraform `infra/local/` |
+| AWS/EKS | `aws` | `k8s/aws/`, Terraform `infra/` e `infra/addons/` |
+
+`k8s/base/` contém apenas os recursos comuns. Escolha `k8s/local` ou `k8s/aws` ao renderizar/aplicar; não aplique a pasta raiz recursivamente. Os perfis `lab` e `aws` exigem credenciais externas e validam o schema. Os valores padrão de desenvolvimento ficam restritos aos perfis locais.
+
+A separação local está preparada para as próximas etapas: ainda é necessário implementar o provisionamento do cluster, banco e deploy locais. Renderizar os manifests não comprova que a infraestrutura está em execução. Consulte [as configurações Kubernetes](k8s/README.md) e [as raízes Terraform](infra/README.md).
+
 ## Por que PostgreSQL
 
 O PostgreSQL foi escolhido por ser um banco relacional maduro, open-source, com suporte nativo e bem documentado no ecossistema Spring Data JPA. O domínio da oficina é fortemente relacional (cliente → veículo → ordem de serviço → peças/serviços, com chaves estrangeiras e integridade referencial reforçada na camada de aplicação), o que se encaixa melhor num modelo relacional do que num banco não-relacional. O PostgreSQL também tem excelente suporte a tipos numéricos precisos (`NUMERIC`), importante para valores monetários, e é o banco padrão de fato em ambientes de produção Java/Spring, o que reduz o custo de operação e manutenção.
@@ -76,7 +91,7 @@ Essa verificação prepara as ferramentas, mas não cria o cluster, não provisi
 
 ### Banco de dados
 
-O perfil local usa `spring.jpa.hibernate.ddl-auto=update`: ao subir, o Hibernate cria/atualiza as tabelas automaticamente em um banco vazio. O Docker Compose aplica o mesmo comportamento via `SPRING_JPA_HIBERNATE_DDL_AUTO=update`. Em Kubernetes/AWS o perfil `docker` continua com `validate` (veja [Deploy no Kubernetes](#deploy-no-kubernetes)).
+O perfil `local` usa `spring.jpa.hibernate.ddl-auto=update`: ao subir, o Hibernate cria/atualiza as tabelas em um banco vazio. O perfil `docker` mantém esse comportamento para desenvolvimento com Compose. Os perfis `lab` e `aws` usam `validate` e exigem preparação prévia do schema (veja [Deploy no Kubernetes](#deploy-no-kubernetes)).
 
 Ao iniciar, a aplicação cria o usuário administrador padrão `admin` / `admin123` (configurável pelas variáveis `ADMIN_USER` e `ADMIN_PASSWORD`).
 
@@ -149,30 +164,43 @@ SPRING_DATASOURCE_URL=jdbc:postgresql://localhost:5433/oficina_db ./mvnw spring-
 ./mvnw clean install
 ```
 
+## Configuração do Kubernetes local
+
+A configuração local usa o namespace `oficina-local`, a imagem `oficina-ddd:local` e o perfil `lab`. Ela não referencia EKS, RDS, ALB ou credenciais AWS. Prepare o arquivo local de desenvolvimento e confira a renderização:
+
+```powershell
+Copy-Item k8s/local/secret.env.example k8s/local/secret.env
+kubectl kustomize k8s/local
+```
+
+`secret.env` é ignorado pelo Git. A saída renderizada contém os valores do Secret codificados; não a publique. Esse comando não acessa o cluster e não realiza deploy. Banco, imagem carregada no kind e componentes de entrada/escala serão preparados nas etapas seguintes.
+
 ## Deploy no Kubernetes
 
-Os manifests em `k8s/` publicam a API usando um PostgreSQL externo. Para deploy automatizado, cada push em `main` que conclui o CI com sucesso dispara o workflow **CD Pipeline**, que publica a imagem com a tag `sha-<commit>` no GHCR e atualiza o Deployment. Configure o secret `KUBE_CONFIG` nas configurações do repositório com o conteúdo do kubeconfig. A imagem do GHCR precisa ser pública para que o cluster possa baixá-la.
+Os manifests em `k8s/aws/` publicam a API no EKS usando um PostgreSQL externo e o perfil `aws`. Para deploy automatizado, cada push em `main` que conclui o CI com sucesso dispara o workflow **CD Pipeline**, que publica a imagem com a tag `sha-<commit>` no GHCR e aplica a configuração AWS com essa imagem. Configure o secret `KUBE_CONFIG` nas configurações do repositório com o conteúdo do kubeconfig. A imagem do GHCR precisa ser pública para que o cluster possa baixá-la.
 
 Antes do primeiro deploy automatizado, crie o namespace `oficina-api` e o Secret `oficina-api-secret` no cluster. O workflow verifica se esse Secret existe e não aplica `secret.yaml.example`, que contém apenas valores placeholder.
 
 Para aplicar os manifests manualmente:
 
-1. Publique a imagem pelo workflow **Build and Push Docker Image** em Actions e anote uma tag existente no GHCR (por exemplo, `sha-<sha-curto>`). Atualize `image` em `k8s/deployment.yaml` com essa tag.
-2. Ajuste o host e, se necessário, `ingressClassName` em `k8s/ingress.yaml`. O cluster precisa ter um controlador Ingress instalado e DNS apontando para ele.
-3. Copie `k8s/secret.yaml.example` para `k8s/secret.yaml` e substitua todos os valores `REPLACE_WITH_...` pela URL JDBC e credenciais do banco externo, segredo JWT aleatório (mínimo de 32 bytes) e credenciais do administrador. O arquivo `k8s/secret.yaml` é ignorado pelo Git; não versione segredos reais. O exemplo não deve ser aplicado sem edição.
+1. Publique a imagem pelo workflow **Build and Push Docker Image** em Actions e anote uma tag existente no GHCR (por exemplo, `sha-<sha-curto>`). Atualize `images.newTag` em `k8s/aws/kustomization.yaml` com essa tag.
+2. Ajuste o host e, se necessário, `ingressClassName` em `k8s/aws/ingress.yaml`. O cluster precisa ter um controlador Ingress instalado e DNS apontando para ele.
+3. Copie `k8s/aws/secret.yaml.example` para `k8s/aws/secret.yaml` e substitua todos os valores `REPLACE_WITH_...` pela URL JDBC e credenciais do banco externo, segredo JWT aleatório (mínimo de 32 bytes) e credenciais do administrador. O arquivo real é ignorado pelo Git; não versione segredos. O exemplo não deve ser aplicado sem edição.
 4. Crie o namespace (uma vez) e aplique os recursos:
 
-```bash
-kubectl create namespace oficina-api
-kubectl apply -n oficina-api -f k8s/
-kubectl rollout status -n oficina-api deployment/oficina-api
+```powershell
+$eksContext = 'SEU_CONTEXTO_EKS'
+kubectl --context $eksContext create namespace oficina-api
+kubectl --context $eksContext apply -n oficina-api -f k8s/aws/secret.yaml
+kubectl --context $eksContext apply -n oficina-api -k k8s/aws
+kubectl --context $eksContext rollout status -n oficina-api deployment/oficina-api
 ```
 
-No PowerShell, use `Copy-Item k8s\secret.yaml.example k8s\secret.yaml` para copiar o exemplo. Se o pacote GHCR for privado, crie um `imagePullSecret` no namespace e referencie-o em `spec.template.spec.imagePullSecrets` no Deployment. O Ingress de exemplo não configura TLS; em produção, configure `spec.tls` com um certificado apropriado.
+No PowerShell, use `Copy-Item k8s/aws/secret.yaml.example k8s/aws/secret.yaml` para copiar o exemplo. Se o pacote GHCR for privado, crie um `imagePullSecret` no namespace e adicione a referência ao Deployment pela configuração AWS. O Ingress de exemplo não configura TLS; em produção, configure um certificado apropriado.
 
-O Deployment e o Service usam a porta 8080 (a porta interna real da aplicação). As probes usam os endpoints de liveness/readiness do Actuator, liberados sem autenticação para uso pelo Kubernetes; a readiness também considera a conexão ao banco. O `ConfigMap` guarda apenas configurações não sensíveis; credenciais ficam no `Secret`. Os valores de `resources` são uma base inicial e devem ser ajustados conforme o consumo observado no cluster.
+O Service expõe a porta 80 e encaminha para a porta 8080 do container no Deployment. As probes usam os endpoints de liveness/readiness do Actuator, liberados sem autenticação para uso pelo Kubernetes; a readiness também considera a conexão ao banco. O `ConfigMap` guarda apenas configurações não sensíveis; credenciais ficam no `Secret`. Os valores de `resources` são uma base inicial e devem ser ajustados conforme o consumo observado no cluster.
 
-O perfil `docker` está configurado com `spring.jpa.hibernate.ddl-auto=validate`: prepare previamente o schema do banco externo para corresponder à aplicação. Esses manifests não criam tabelas nem executam migrações.
+O perfil `aws` está configurado com `spring.jpa.hibernate.ddl-auto=validate`: prepare previamente o schema do banco externo para corresponder à aplicação. Esses manifests não criam tabelas nem executam migrações.
 
 ## Infraestrutura AWS com Terraform
 
@@ -201,23 +229,25 @@ terraform -chdir=infra/addons apply `
   -var="cluster_name=$cluster" `
   -var="vpc_id=$vpc" `
   -var="controller_role_arn=$controllerRole"
-kubectl create namespace oficina-api
-Copy-Item k8s\secret.yaml.example k8s\secret.yaml
+$eksContext = 'SEU_CONTEXTO_EKS'
+kubectl --context $eksContext create namespace oficina-api
+Copy-Item k8s/aws/secret.yaml.example k8s/aws/secret.yaml
 ```
 
-Abra no AWS Secrets Manager o ARN exibido por `terraform -chdir=infra output -raw database_master_secret_arn` e copie a senha gerenciada pelo RDS para `SPRING_DATASOURCE_PASSWORD` em `k8s/secret.yaml`. Preencha também `SPRING_DATASOURCE_URL` usando o endpoint de `terraform -chdir=infra output -raw database_endpoint`, e defina valores fortes para `JWT_SECRET`, `ADMIN_USER` e `ADMIN_PASSWORD`. Depois aplique os manifests:
+Abra no AWS Secrets Manager o ARN exibido por `terraform -chdir=infra output -raw database_master_secret_arn` e copie a senha gerenciada pelo RDS para `SPRING_DATASOURCE_PASSWORD` em `k8s/aws/secret.yaml`. Preencha também `SPRING_DATASOURCE_URL` usando o endpoint de `terraform -chdir=infra output -raw database_endpoint`, e defina valores fortes para `JWT_SECRET`, `ADMIN_USER` e `ADMIN_PASSWORD`. Depois aplique os manifests no contexto EKS escolhido:
 
 ```powershell
-kubectl apply -n oficina-api -f k8s\
-kubectl rollout status -n oficina-api deployment/oficina-api
-kubectl get ingress -n oficina-api oficina-api
+kubectl --context $eksContext apply -n oficina-api -f k8s/aws/secret.yaml
+kubectl --context $eksContext apply -n oficina-api -k k8s/aws
+kubectl --context $eksContext rollout status -n oficina-api deployment/oficina-api
+kubectl --context $eksContext get ingress -n oficina-api oficina-api
 ```
 
 Não coloque credenciais em `terraform.tfvars`, no Git ou na linha de comando. Se a imagem GHCR for privada, crie um `imagePullSecret` no namespace e referencie-o no Deployment.
 
-O RDS é criado sem tabelas. Como o perfil `docker` usa `spring.jpa.hibernate.ddl-auto=validate`, inicialize o schema por uma migração/script SQL aprovado antes de iniciar os pods; este repositório não inclui migrações de banco.
+O RDS é criado sem tabelas. Como o perfil `aws` usa `spring.jpa.hibernate.ddl-auto=validate`, inicialize o schema por uma migração/script SQL aprovado antes de iniciar os pods. O SQL incremental existente não cria o schema inicial; migrações completas ainda serão implementadas.
 
-Por padrão, a configuração usa nós `t3.medium`, RDS `db.t4g.micro`, um NAT Gateway e banco Single-AZ; esses recursos e o endpoint EKS geram cobrança contínua na AWS. A aplicação usa a senha mestra do RDS neste exemplo; para produção, crie um usuário PostgreSQL exclusivo com privilégios mínimos e use suas credenciais no Secret. O RDS tem proteção contra exclusão habilitada; para removê-lo intencionalmente, altere `database_deletion_protection` para `false`, aplique essa mudança e só então destrua a infraestrutura. Antes de destruir o cluster, remova o Ingress/ALB e o controller (`kubectl delete ingress -n oficina-api oficina-api` e `terraform -chdir=infra/addons destroy`, informando os mesmos valores `-var` usados ao aplicar); o snapshot final do banco permanece na AWS e pode continuar gerando custo. A escalabilidade horizontal é feita pelo `k8s/hpa.yaml`: o HPA mantém de 2 a 5 réplicas conforme a CPU (alvo de 70% do `request`), usando o metrics-server instalado por `infra/addons/`. O Deployment não fixa `replicas`, para não conflitar com o HPA. Para testes curtos, use o perfil `infra/estudante.tfvars.example` (mantém os nós padrão; apenas desliga a proteção contra exclusão e o snapshot final do RDS) e, ao terminar, rode `./scripts/destroy.sh` (bash): ele remove o Ingress e espera o ALB sumir, destrói o controller e a infraestrutura principal e lista qualquer recurso que tenha ficado cobrando. O ALB é HTTP; configure certificado ACM e TLS antes de expor dados reais. O estado local do Terraform deve ser protegido e migrado para backend remoto criptografado/lock antes de uso por equipe ou produção.
+Por padrão, a configuração usa nós `t3.medium`, RDS `db.t4g.micro`, um NAT Gateway e banco Single-AZ; esses recursos e o endpoint EKS geram cobrança contínua na AWS. A aplicação usa a senha mestra do RDS neste exemplo; para produção, crie um usuário PostgreSQL exclusivo com privilégios mínimos e use suas credenciais no Secret. O RDS tem proteção contra exclusão habilitada; para removê-lo intencionalmente, altere `database_deletion_protection` para `false`, aplique essa mudança e só então destrua a infraestrutura. Antes de destruir o cluster, remova o Ingress/ALB e o controller (`kubectl --context $eksContext delete ingress -n oficina-api oficina-api` e `terraform -chdir=infra/addons destroy`, informando os mesmos valores `-var` usados ao aplicar); o snapshot final do banco permanece na AWS e pode continuar gerando custo. A escalabilidade horizontal é feita pelo `k8s/aws/hpa.yaml`: o HPA mantém de 2 a 5 réplicas conforme a CPU (alvo de 70% do `request`), usando o metrics-server instalado por `infra/addons/`. O Deployment não fixa `replicas`, para não conflitar com o HPA. Para testes curtos, use o perfil `infra/estudante.tfvars.example` (mantém os nós padrão; apenas desliga a proteção contra exclusão e o snapshot final do RDS) e, ao terminar, rode `./scripts/destroy.sh` (bash): ele remove o Ingress e espera o ALB sumir, destrói o controller e a infraestrutura principal e lista qualquer recurso que tenha ficado cobrando. O ALB é HTTP; configure certificado ACM e TLS antes de expor dados reais. O estado local do Terraform deve ser protegido e migrado para backend remoto criptografado/lock antes de uso por equipe ou produção.
 
 ## Interface Swagger
 
