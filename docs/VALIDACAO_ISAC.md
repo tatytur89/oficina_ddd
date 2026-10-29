@@ -13,7 +13,7 @@ Base: `dev` em `edacd5c`. Implementação e revisão em 28/10/2026.
 
 ## Testes e avaliação
 
-Agentes separados implementaram testes e revisaram a qualidade. Os bloqueadores encontrados na revisão foram corrigidos antes da publicação da etapa correspondente. Commits e pushes foram feitos em etapas na branch isac.
+As implementações foram verificadas por testes automatizados e revisão técnica. Os problemas bloqueadores encontrados foram corrigidos antes da publicação da etapa correspondente.
 
 Comando final:
 

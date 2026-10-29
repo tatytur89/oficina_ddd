@@ -38,10 +38,41 @@ sudo usermod -aG docker $USER
 ### Clonar o repositório
 
 ```bash
-git clone https://github.com/robert-portilho/oficina-ddd
-cd oficina-ddd
+git clone https://github.com/tatytur89/oficina_ddd.git
+cd oficina_ddd
 chmod +x mvnw
 ```
+
+### Pré-requisitos para Kubernetes local
+
+Para o laboratório Kubernetes local, disponibilize as ferramentas abaixo. As versões indicadas foram verificadas na preparação do ambiente em 29/10/2026:
+
+| Ferramenta | Versão verificada | Finalidade |
+|---|---|---|
+| Docker Engine | 29.4.2 | Executar containers Linux |
+| Docker Compose | 5.1.3 | Ambiente de desenvolvimento |
+| Terraform | 1.17.1 | Provisionamento como código |
+| kind | 0.33.0 | Cluster Kubernetes local em containers |
+| kubectl | 1.34.1 | Operação e inspeção do cluster |
+| Helm | 3.22.1 | Instalação de componentes do cluster |
+
+Instale os binários pelas fontes oficiais e confira os checksums publicados: [Terraform](https://developer.hashicorp.com/terraform/install), [kind](https://kind.sigs.k8s.io/docs/user/quick-start/) e [Helm](https://helm.sh/docs/intro/install/). Mantenha os executáveis no PATH e abra um novo terminal após a instalação. No Windows, use o Docker Desktop com backend WSL 2 e containers Linux.
+
+Verifique as ferramentas e a comunicação com o Docker:
+
+```bash
+docker version
+docker compose version
+terraform version
+kind version
+kubectl version --client
+helm version --short
+docker run --rm hello-world
+```
+
+O teste `hello-world` deve terminar com sucesso e remover seu próprio container. A imagem permanece no cache. Como referência inicial para o laboratório, reserve 4 CPUs, 8 GiB de memória para o Docker e 20 GiB livres para imagens e dados; a carga real será medida durante o deploy e os testes de escala.
+
+Essa verificação prepara as ferramentas, mas não cria o cluster, não provisiona recursos AWS e não valida o deploy. A imagem Kubernetes escolhida para o kind deverá ser compatível com a versão do kubectl. A configuração Terraform e os manifests AWS existentes são descritos nas seções próprias abaixo.
 
 ### Banco de dados
 
