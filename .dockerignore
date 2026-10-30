@@ -1,0 +1,10 @@
+# Apenas arquivos necessários ao build; kubeconfigs, Secrets, state e planos ficam fora.
+**
+!.mvn/
+!.mvn/wrapper/
+!.mvn/wrapper/maven-wrapper.properties
+!mvnw
+!pom.xml
+!src/
+!src/main/
+!src/main/**

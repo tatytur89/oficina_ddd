@@ -30,7 +30,7 @@ O código da aplicação é compartilhado. As configurações de desenvolvimento
 
 `k8s/base/` contém apenas os recursos comuns. Escolha `k8s/local` ou `k8s/aws` ao renderizar/aplicar; não aplique a pasta raiz recursivamente. Os perfis `lab` e `aws` exigem credenciais externas e validam o schema. Os valores padrão de desenvolvimento ficam restritos aos perfis locais.
 
-O cluster local é provisionado por [Terraform e kind](infra/local/README.md). O [PostgreSQL e suas migrações](infra/local/database/README.md) usam uma raiz Terraform independente. O deploy local da aplicação será preparado na próxima etapa. Renderizar os manifests não comprova que a infraestrutura está em execução. Consulte também [as configurações Kubernetes](k8s/README.md) e [as raízes Terraform](infra/README.md).
+O cluster local é provisionado por [Terraform e kind](infra/local/README.md). O [PostgreSQL e suas migrações](infra/local/database/README.md) usam uma raiz Terraform independente. O [deploy da aplicação local](k8s/local/README.md) constrói a imagem, carrega nos nós e aplica a configuração `lab`. Renderizar os manifests não comprova que a infraestrutura está em execução. Consulte também [as configurações Kubernetes](k8s/README.md) e [as raízes Terraform](infra/README.md).
 
 ## Por que PostgreSQL
 
@@ -173,7 +173,7 @@ Copy-Item k8s/local/secret.env.example k8s/local/secret.env
 kubectl kustomize k8s/local
 ```
 
-`secret.env` é ignorado pelo Git. A saída renderizada contém os valores do Secret codificados; não a publique. Esse comando não acessa o cluster e não realiza deploy. Prepare o banco com [sua raiz Terraform](infra/local/database/README.md) e mantenha as credenciais iguais às do Secret da aplicação. Imagem carregada no kind e componentes de entrada/escala serão preparados nas etapas seguintes.
+`secret.env` é ignorado pelo Git. A saída renderizada contém os valores do Secret codificados; não a publique. Esse comando não acessa o cluster e não realiza deploy. Prepare o banco com [sua raiz Terraform](infra/local/database/README.md) e mantenha as credenciais iguais às do Secret da aplicação. Execute [o script de build e deploy](k8s/local/README.md) para carregar uma imagem exclusiva nos nós e aguardar o rollout. Ingress e escala locais serão preparados nas etapas seguintes.
 
 ## Deploy no Kubernetes
 

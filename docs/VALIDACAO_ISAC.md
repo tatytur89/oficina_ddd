@@ -112,3 +112,27 @@ O teste independente criou namespace temporário exclusivo, verificou autentica�
 O destroy do banco preservou namespace e PVC Bound. A limpeza posterior removeu somente o namespace criado pelo teste, após conferir seu UID. Nove snapshots externos permaneceram iguais. O banco de desenvolvimento em `oficina-local` permaneceu ativo, com PVC Bound, Job concluído e plano Terraform sem alterações.
 
 Não houve deploy da aplicação, Ingress, HPA ou recursos AWS. O armazenamento é local ao nó kind: excluir PVC/namespace ou substituir o cluster perde dados. Rotação automática de senha e adoção de banco existente não são implementadas; os procedimentos e limites estão em `infra/local/database/README.md`.
+
+## Deploy da aplicação no Kubernetes local — 29/10/2026
+
+O script `scripts/Deploy-Local.ps1` valida cluster, namespace, banco, migração e Secret antes de aplicar a aplicação. Constrói imagem com tag exclusiva e origem Git, carrega um único arquivo nos dois nós e compara o ID da configuração da imagem no CRI. Essa comparação distingue o ID de índice OCI exposto pelo Docker do ID de configuração exposto pelo containerd. O template registra a identidade do artefato para evitar reutilização silenciosa de Pod antigo.
+
+O Dockerfile usa bases fixadas por digest, wrapper executável e porta interna 8080. O contexto Docker inclui somente arquivos necessários ao build. O Deployment desativa token da ServiceAccount e usa UID/GID 1001, sem elevação de privilégio, capabilities ou permissões além do seccomp padrão. O perfil `lab` e Hibernate `validate` são preservados.
+
+Validações executadas:
+
+```powershell
+./mvnw.cmd clean verify '-Ddependency-check.skip=true' -B
+docker build --check .
+powershell.exe -NoProfile -ExecutionPolicy RemoteSigned -File scripts/tests/Test-EnvironmentSeparation.ps1
+# Informar a tag local e APP_COMMIT_SHA da imagem construída para o teste.
+powershell.exe -NoProfile -ExecutionPolicy RemoteSigned -File scripts/tests/Test-LocalDeployment.ps1 -Image oficina-ddd:local-<identificador> -ExpectedCommit <sha-completo-ou-sha-dirty>
+```
+
+Resultados: **59 verificações integradas de deploy/API** e **70 verificações de isolamento**, aprovadas. A suíte Maven completa passou com **438 testes executados**, **3 testes PostgreSQL opt-in ignorados**, sem erros ou falhas, e **97,60% de cobertura de linhas**. Os três testes PostgreSQL já haviam passado na execução dedicada da etapa anterior. Dependency-Check permaneceu desativado. Build real da imagem e checagem estática Docker passaram.
+
+O teste integrado criou banco e aplicação em namespace temporário exclusivo e usou o script real de deploy com imagem identificada por `-dirty`. Verificou preflight sem banco, rollout de uma réplica, perfil, política de imagem local, liveness/readiness, Swagger, origem da imagem e acesso pelo Service/DNS interno. Exercitou bloqueio sem JWT, senha incorreta, login, cadastros e abertura de OS com itens e total exato de R$ 438,20; recusa sem baixa de estoque, reenvio, rejeição de versão antiga, aprovação repetida com baixa única e entrega fora da fila, mantendo histórico.
+
+Ao pausar somente o PostgreSQL do ambiente temporário, a readiness respondeu 503 e a liveness permaneceu 200; a API recuperou readiness 200 após o retorno do banco. A limpeza removeu somente o namespace criado pelo teste, após conferir seu UID, e nove snapshots externos permaneceram iguais.
+
+A aplicação de desenvolvimento ficou com uma réplica Ready em `oficina-local`, sem reinícios, usando o PostgreSQL existente. O acesso nesta etapa é por port-forward em loopback, conforme `k8s/local/README.md`. Ingress, metrics-server e HPA locais ainda não foram implementados. Nenhum recurso AWS ou imagem em registry externo foi criado.

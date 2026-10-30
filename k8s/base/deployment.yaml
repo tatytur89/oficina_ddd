@@ -13,6 +13,7 @@ spec:
       labels:
         app.kubernetes.io/name: oficina-api
     spec:
+      automountServiceAccountToken: false
       terminationGracePeriodSeconds: 30
       containers:
         - name: oficina-api
@@ -56,6 +57,8 @@ spec:
               cpu: "1"
               memory: 1Gi
           securityContext:
+            seccompProfile:
+              type: RuntimeDefault
             allowPrivilegeEscalation: false
             runAsNonRoot: true
             runAsUser: 1001
