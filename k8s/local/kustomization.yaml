@@ -4,6 +4,8 @@ namespace: oficina-local
 resources:
   - ../base
   - namespace.yaml
+  - ingress.yaml
+  - hpa.yaml
 configMapGenerator:
   - name: oficina-api-config
     behavior: merge

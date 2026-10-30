@@ -113,8 +113,11 @@ try {
     Assert-Check ($localDeployment.Count -eq 1) 'Local overlay renders exactly one application Deployment'
     Assert-Namespaces $localDocs 'oficina-local'
     Assert-Check ($localYaml -notmatch '(?i)amazonaws\.com|alb\.ingress|ghcr\.io') 'Local overlay contains no AWS endpoint, ALB annotation or GHCR image'
-    Assert-Check (@($localDocs | Where-Object { (Get-Kind $_) -in @('Ingress', 'HorizontalPodAutoscaler') }).Count -eq 0) 'Local stage has no AWS Ingress or production HPA'
-    Assert-Check ($localDeployment[0] -match '(?m)^  replicas: 1\s*$') 'Local Deployment starts with one replica'
+    $localIngress = @($localDocs | Where-Object { (Get-Kind $_) -eq 'Ingress' })
+    $localHpa = @($localDocs | Where-Object { (Get-Kind $_) -eq 'HorizontalPodAutoscaler' })
+    Assert-Check ($localIngress.Count -eq 1 -and $localIngress[0] -match 'ingressClassName:[ \t]*traefik' -and $localIngress[0] -match 'host:[ \t]*oficina\.local') 'Local Ingress targets Traefik and its explicit local host'
+    Assert-Check ($localHpa.Count -eq 1 -and $localHpa[0] -match 'minReplicas:[ \t]*2' -and $localHpa[0] -match 'maxReplicas:[ \t]*5' -and $localHpa[0] -match 'averageUtilization:[ \t]*70') 'Local HPA scales two to five replicas using actual CPU utilization'
+    Assert-Check ($localDeployment[0] -notmatch '(?m)^  replicas:') 'Local Deployment leaves replica ownership to the HPA'
     Assert-Check ($localDeployment[0] -match 'image:[ \t]*oficina-ddd:local') 'Local Deployment uses its loaded local image'
     Assert-Check ($localDeployment[0] -match 'imagePullPolicy:[ \t]*Never') 'Local Deployment never pulls its image from a registry'
     Assert-Check ($localYaml -match 'SPRING_PROFILES_ACTIVE:[ \t]*["'']?lab["'']?\s') 'Local overlay selects the lab Spring profile'
@@ -162,7 +165,8 @@ try {
     Assert-Check ($workflow -match 'set image' -and $workflow -match 'sha-' -and $workflow -match 'head_sha') 'CD keeps image replacement tied to the tested commit'
 
     foreach ($path in @('k8s/local/secret.env', 'k8s/aws/secret.yaml', 'infra/local/terraform.tfstate', 'infra/local/terraform.tfvars', 'infra/local/.terraform/providers/placeholder',
-            'infra/local/database/terraform.tfstate', 'infra/local/database/terraform.tfvars', 'infra/local/database/.terraform/providers/placeholder', 'infra/local/database/database.tfplan')) {
+            'infra/local/database/terraform.tfstate', 'infra/local/database/terraform.tfvars', 'infra/local/database/.terraform/providers/placeholder', 'infra/local/database/database.tfplan',
+            'infra/local/addons/.terraform/providers/placeholder', 'infra/local/addons/terraform.tfvars', 'infra/local/addons/terraform.tfstate', 'infra/local/addons/addons.tfplan')) {
         $ignored = Invoke-Native 'git' @('check-ignore', '--no-index', $path)
         Assert-Check ($ignored.Code -eq 0) "Sensitive or generated path is ignored: $path"
     }

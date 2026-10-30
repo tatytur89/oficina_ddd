@@ -11,6 +11,7 @@ $tempParent = [IO.Path]::GetFullPath([IO.Path]::GetTempPath())
 $testRoot = Join-Path $tempParent ('oficina-deployment-smoke-' + [Guid]::NewGuid().ToString('N'))
 $moduleRoot = Join-Path $testRoot 'infra/local/database'
 $namespace = 'oficina-db-test-' + [Guid]::NewGuid().ToString('N').Substring(0,10)
+$ingressHost = 'smoke-' + $namespace.Substring('oficina-db-test-'.Length) + '.oficina.local'
 $kubeconfig = [IO.Path]::GetFullPath((Join-Path $repoRoot 'infra/local/.generated/kubeconfig'))
 $clusterArgs = @('--kubeconfig',$kubeconfig,'--context','kind-oficina-local')
 $nsArgs = $clusterArgs + @('--namespace',$namespace)
@@ -55,7 +56,7 @@ function Invoke-DatabaseTerraform([string[]]$Arguments,[int]$TimeoutSeconds=600)
 
 function Invoke-Deploy {
     return Invoke-TestTool 'powershell.exe' @('-NoProfile','-ExecutionPolicy','RemoteSigned','-File',
-        (Join-Path $repoRoot 'scripts/Deploy-Local.ps1'),'-Namespace',$namespace,'-SecretFile',$secretFile,'-Image',$Image) 600
+        (Join-Path $repoRoot 'scripts/Deploy-Local.ps1'),'-Namespace',$namespace,'-SecretFile',$secretFile,'-Image',$Image,'-IngressHost',$ingressHost) 600
 }
 
 function Invoke-Http([string]$Path,[string]$Method='GET',[object]$Body=$null,[string]$Token='') {
@@ -134,8 +135,9 @@ try {
     if($deployment.Code -ne 0){throw ('Deployment failed: '+($deployment.Output+$deployment.Error).Replace($password,'<redacted>').Replace($adminPassword,'<redacted>'))}
     Assert-Check $true 'Production deployment script applies the prebuilt image and completes rollout'
     $pods=Assert-TestTool 'kubectl' ($nsArgs+@('get','pods','-l','app.kubernetes.io/name=oficina-api','-o','json'))|ConvertFrom-Json
-    Assert-Check (@($pods.items).Count -eq 1) 'Deployment runs exactly one local API pod'
-    Assert-Check (@($pods.items[0].status.conditions|Where-Object{$_.type -eq 'Ready' -and $_.status -eq 'True'}).Count -eq 1) 'API pod is Ready'
+    Assert-Check (@($pods.items).Count -ge 2) 'Deployment runs at least two local API pods'
+    $readyPods=@($pods.items|Where-Object{$_.status.PSObject.Properties.Name -contains 'conditions' -and @($_.status.conditions|Where-Object{$_.type -eq 'Ready' -and $_.status -eq 'True'}).Count -eq 1})
+    Assert-Check ($readyPods.Count -ge 2) 'At least two API pods are Ready'
     $configMapName=($pods.items[0].spec.containers[0].envFrom|Where-Object{$_.PSObject.Properties.Name -contains 'configMapRef'}).configMapRef.name
     $config=Assert-TestTool 'kubectl' ($nsArgs+@('get','configmap',$configMapName,'-o','json'))|ConvertFrom-Json
     Assert-Check ($config.data.SPRING_PROFILES_ACTIVE -eq 'lab') 'API uses only the local lab profile'

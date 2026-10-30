@@ -136,3 +136,31 @@ O teste integrado criou banco e aplicação em namespace temporário exclusivo e
 Ao pausar somente o PostgreSQL do ambiente temporário, a readiness respondeu 503 e a liveness permaneceu 200; a API recuperou readiness 200 após o retorno do banco. A limpeza removeu somente o namespace criado pelo teste, após conferir seu UID, e nove snapshots externos permaneceram iguais.
 
 A aplicação de desenvolvimento ficou com uma réplica Ready em `oficina-local`, sem reinícios, usando o PostgreSQL existente. O acesso nesta etapa é por port-forward em loopback, conforme `k8s/local/README.md`. Ingress, metrics-server e HPA locais ainda não foram implementados. Nenhum recurso AWS ou imagem em registry externo foi criado.
+
+## Ingress, métricas e HPA locais — 30/10/2026
+
+A raiz independente `infra/local/addons/` instala Traefik e Metrics Server por Helm, com versões e imagens fixadas. O Traefik usa hostPorts no control plane, classe `traefik` e label de opt-in; o acesso HTTP utiliza a porta de loopback já configurada no cluster. O Service do controlador é ClusterIP, configurado pelo campo `service.spec.type` do chart 42.1.3 e conferido em runtime. Os dois releases mantêm `atomic=true`.
+
+O overlay local inclui Ingress e HPA de CPU, com mínimo de 2, máximo de 5 e alvo de 70% dos requests. O Deployment não fixa `replicas`; o script espera o mínimo de Pods disponíveis, preserva o controle do HPA e usa hosts exclusivos para testes. A redução considera 60 segundos de estabilização e remove no máximo um Pod a cada 30 segundos. A configuração AWS mantém seus parâmetros anteriores.
+
+Validações executadas:
+
+```powershell
+terraform -chdir=infra/local/addons fmt -check
+terraform -chdir=infra/local/addons validate
+terraform -chdir=infra/local/addons plan -detailed-exitcode
+powershell.exe -NoProfile -ExecutionPolicy RemoteSigned -File scripts/tests/Test-EnvironmentSeparation.ps1
+powershell.exe -NoProfile -ExecutionPolicy RemoteSigned -File scripts/tests/Test-LocalScaling.ps1 -Image oficina-ddd:local-<identificador> -ExpectedCommit <sha-completo>
+powershell.exe -NoProfile -ExecutionPolicy RemoteSigned -File scripts/tests/Test-LocalDeployment.ps1 -Image oficina-ddd:local-<identificador> -ExpectedCommit <sha-completo>
+./mvnw.cmd clean verify '-Ddependency-check.skip=true' -B
+```
+
+Resultados: **30 verificações reais de Ingress/métricas/escala**, **59 verificações de regressão da API com pelo menos duas réplicas** e **77 verificações de isolamento**, aprovadas. Maven passou com **438 testes executados**, **3 testes PostgreSQL opt-in ignorados**, nenhum erro ou falha e **97,60% de cobertura de linhas**. Dependency-Check permaneceu desativado.
+
+O teste de escala confirmou Service ClusterIP sem NodePorts, API de métricas disponível, hostname isolado direcionado aos Pods corretos e resposta 404 para hostname desconhecido. Partiu de **2 réplicas Ready** com CPU baixa; oito clientes HTTP de login com senha incorreta elevaram a CPU do HPA até **375%** dos requests, com **3.866,695123 millicores** observados em quatro Pods. O HPA aumentou para quatro réplicas prontas e o máximo observado na janela foi **cinco**. Após remover a carga, reduziu **5 → 4 → 3 → 2**, sem forçar escala da API. As três amostras finais tinham 2 réplicas atuais/desejadas/prontas e CPU de 1%.
+
+O Ingress respondeu saúde UP após a escala. A carga tinha prazo máximo de 900 segundos e recursos limitados. A limpeza removeu somente o namespace cujo UID foi criado pelo teste, e dez snapshots externos, incluindo o arquivo hosts, permaneceram iguais. As 30 amostras e métricas sanitizadas ficaram em `target/local-evidence/scaling.json`, ignorado pelo Git.
+
+A regressão HTTP confirmou novamente autenticação, CRUD, abertura de OS, recusa, reenvio, aprovação idempotente, estoque e histórico com o mínimo de duas réplicas. Readiness/liveness e recuperação após indisponibilidade do banco passaram; seu namespace exclusivo foi removido e nove snapshots externos permaneceram iguais.
+
+Os planos das raízes de cluster, banco e addons ficaram sem alterações; cluster e banco não foram recriados. A aplicação principal atendeu HTTP em `127.0.0.1:8090`, com header `Host: oficina.local`, e permaneceu com mínimo de duas réplicas. TLS confiável, EKS e exposição pública não foram homologados; as exceções de certificado do Metrics Server estão restritas ao kind e documentadas na raiz dos addons.

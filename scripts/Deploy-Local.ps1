@@ -2,13 +2,18 @@
 param(
     [string]$Namespace = 'oficina-local',
     [string]$SecretFile,
-    [string]$Image
+    [string]$Image,
+    [string]$IngressHost
 )
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 $repoRoot = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
 if ($Namespace -notmatch '^(oficina-local|oficina-db-test-[a-z0-9]+)$') { throw 'Invalid local namespace.' }
+if (!$IngressHost) { $IngressHost = if ($Namespace -eq 'oficina-local') { 'oficina.local' } else { "$Namespace.oficina.local" } }
+if ($IngressHost -notmatch '^(oficina\.local|[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.oficina\.local)$') {
+    throw 'Use oficina.local or a dedicated <name>.oficina.local host.'
+}
 if (!$SecretFile) { $SecretFile = Join-Path $repoRoot 'k8s/local/secret.env' }
 $SecretFile = [IO.Path]::GetFullPath($SecretFile)
 if (!(Test-Path -LiteralPath $SecretFile -PathType Leaf)) { throw 'Create the local secret.env from its example before deploying.' }
@@ -25,6 +30,14 @@ $namespaceUid = $namespaceInfo.metadata.uid
 $deployLock = New-Object Threading.Mutex($false, "Local\OficinaDeploy-$Namespace")
 try { $locked = $deployLock.WaitOne(0) } catch [Threading.AbandonedMutexException] { $locked = $true }
 if (!$locked) { $deployLock.Dispose(); throw 'Another deployment is managing this namespace.' }
+$hostLock = New-Object Threading.Mutex($false, "Local\OficinaIngress-$IngressHost")
+try { $hostLocked = $hostLock.WaitOne(0) } catch [Threading.AbandonedMutexException] { $hostLocked = $true }
+if (!$hostLocked) {
+    $hostLock.Dispose()
+    $deployLock.ReleaseMutex()
+    $deployLock.Dispose()
+    throw 'Another deployment is managing this Ingress host.'
+}
 $tempParent = [IO.Path]::GetFullPath([IO.Path]::GetTempPath())
 $tempRoot = Join-Path $tempParent ('oficina-deploy-' + [Guid]::NewGuid().ToString('N'))
 try {
@@ -51,6 +64,22 @@ try {
     foreach ($job in $schemaJobs) {
         $complete = @($job.status.conditions | Where-Object { $_.type -eq 'Complete' -and $_.status -eq 'True' })
         if ($complete.Count -eq 0) { throw 'A schema migration Job has not completed successfully.' }
+    }
+    Invoke-Tool 'kubectl' ($clusterArgs + @('wait', '--for=condition=Available', 'apiservice/v1beta1.metrics.k8s.io', '--timeout=120s')) | Write-Host
+    $ingressClass = Invoke-Tool 'kubectl' ($clusterArgs + @('get', 'ingressclass', 'traefik', '-o', 'json')) | ConvertFrom-Json
+    if ($ingressClass.spec.controller -cne 'traefik.io/ingress-controller') { throw 'Expected the local Traefik IngressClass.' }
+    Invoke-Tool 'kubectl' ($clusterArgs + @('-n', 'oficina-ingress', 'rollout', 'status', 'deployment/oficina-traefik', '--timeout=180s')) | Write-Host
+    $ingressService = Invoke-Tool 'kubectl' ($clusterArgs + @('-n', 'oficina-ingress', 'get', 'service', 'oficina-traefik', '-o', 'json')) | ConvertFrom-Json
+    if ($ingressService.spec.type -cne 'ClusterIP') { throw 'Expected an internal Traefik Service; local access must use the reserved hostPorts.' }
+    $ingresses = Invoke-Tool 'kubectl' ($clusterArgs + @('get', 'ingress', '--all-namespaces', '-o', 'json')) | ConvertFrom-Json
+    foreach ($ingress in $ingresses.items) {
+        if ($ingress.spec.PSObject.Properties.Name -notcontains 'rules') { continue }
+        foreach ($rule in $ingress.spec.rules) {
+            if ($rule.PSObject.Properties.Name -notcontains 'host') { continue }
+            if ($rule.host -ceq $IngressHost -and ($ingress.metadata.namespace -cne $Namespace -or $ingress.metadata.name -cne 'oficina-api')) {
+                throw 'The requested Ingress host is already owned by another resource.'
+            }
+        }
     }
     $databaseSecret = Invoke-Tool 'kubectl' ($namespaceArgs + @('get', 'secret', 'postgres-secret', '-o', 'json')) | ConvertFrom-Json
     $databasePassword = [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String($databaseSecret.data.POSTGRES_PASSWORD))
@@ -110,12 +139,22 @@ try {
     $patch = [IO.File]::ReadAllText($patchPath)
     $patch = $patch -replace '(?m)^  template:\r?\n', ("  template:`n    metadata:`n      annotations:`n        oficina.fiap.local/image-id: '$imageId'`n        oficina.fiap.local/source: '$source'`n")
     [IO.File]::WriteAllText($patchPath, $patch)
+    $ingressPath = Join-Path $overlay 'ingress.yaml'
+    $ingressYaml = [IO.File]::ReadAllText($ingressPath) -replace '(?m)^    - host:.*$', ("    - host: $IngressHost")
+    [IO.File]::WriteAllText($ingressPath, $ingressYaml)
     $currentNamespace = Invoke-Tool 'kubectl' ($clusterArgs + @('get', 'namespace', $Namespace, '-o', 'json')) | ConvertFrom-Json
     if ($currentNamespace.metadata.uid -cne $namespaceUid) { throw 'Namespace changed during deployment; refusing to apply.' }
     Invoke-Tool 'kubectl' ($namespaceArgs + @('apply', '-k', $overlay)) | Write-Host
     Invoke-Tool 'kubectl' ($namespaceArgs + @('rollout', 'status', 'deployment/oficina-api', '--timeout=300s')) | Write-Host
-    $deployment = Invoke-Tool 'kubectl' ($namespaceArgs + @('get', 'deployment', 'oficina-api', '-o', 'json')) | ConvertFrom-Json
-    if ($deployment.spec.template.spec.containers[0].image -cne $Image -or $deployment.status.availableReplicas -ne 1) {
+    $autoscaler = Invoke-Tool 'kubectl' ($namespaceArgs + @('get', 'hpa', 'oficina-api', '-o', 'json')) | ConvertFrom-Json
+    $readyDeadline = [DateTime]::UtcNow.AddSeconds(180)
+    do {
+        $deployment = Invoke-Tool 'kubectl' ($namespaceArgs + @('get', 'deployment', 'oficina-api', '-o', 'json')) | ConvertFrom-Json
+        $available = if ($deployment.status.PSObject.Properties.Name -contains 'availableReplicas') { $deployment.status.availableReplicas } else { 0 }
+        if ($available -ge $autoscaler.spec.minReplicas) { break }
+        Start-Sleep -Seconds 3
+    } while ([DateTime]::UtcNow -lt $readyDeadline)
+    if ($deployment.spec.template.spec.containers[0].image -cne $Image -or $available -lt $autoscaler.spec.minReplicas) {
         throw 'The expected image is not available in the local deployment.'
     }
     if ($deployment.spec.template.metadata.annotations.'oficina.fiap.local/image-id' -cne $imageId) {
@@ -125,6 +164,7 @@ try {
     $config = Invoke-Tool 'kubectl' ($namespaceArgs + @('get', 'configmap', $configName, '-o', 'json')) | ConvertFrom-Json
     if ($config.data.SPRING_PROFILES_ACTIVE -cne 'lab') { throw 'Expected the lab Spring profile.' }
     Write-Host "Deployment ready: namespace=$Namespace image=$Image source=$source"
+    Write-Host "Ingress host: $IngressHost (use the cluster HTTP port with this Host header). HPA: $($autoscaler.spec.minReplicas)..$($autoscaler.spec.maxReplicas)."
     Write-Host "Access: kubectl --kubeconfig infra/local/.generated/kubeconfig --context kind-oficina-local -n $Namespace port-forward --address=127.0.0.1 service/oficina-api 8089:80"
 } finally {
     if (Test-Path -LiteralPath $tempRoot) {
@@ -135,4 +175,6 @@ try {
     }
     $deployLock.ReleaseMutex()
     $deployLock.Dispose()
+    $hostLock.ReleaseMutex()
+    $hostLock.Dispose()
 }

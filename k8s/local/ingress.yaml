@@ -1,0 +1,19 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: oficina-api
+  labels:
+    app.kubernetes.io/part-of: oficina-local
+spec:
+  ingressClassName: traefik
+  rules:
+    - host: oficina.local
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: oficina-api
+                port:
+                  number: 80

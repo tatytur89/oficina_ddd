@@ -65,4 +65,4 @@ O teste copia a configuração para um diretório temporário, usa nome e portas
 
 O segundo comando usa ferramentas simuladas em processos isolados para verificar concorrência, troca de Engine, endpoints remotos, colisão de nomes e falhas parciais. Ele não executa Docker, kind ou kubectl reais.
 
-O próximo passo é [provisionar PostgreSQL e executar as migrações](database/README.md), em raiz Terraform independente. Aplicação, Ingress e HPA serão preparados posteriormente. A execução local não homologa o provisionamento EKS/RDS.
+Após o cluster, [provisione PostgreSQL e execute as migrações](database/README.md), instale os [addons de entrada e métricas](addons/README.md) e faça o [deploy da aplicação com HPA](../../k8s/local/README.md). Cada raiz Terraform tem estado independente. A execução local não homologa o provisionamento EKS/RDS.

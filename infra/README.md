@@ -6,6 +6,7 @@
 | `infra/addons/` | AWS | Componentes Helm instalados no EKS |
 | `infra/local/` | Local | Raiz isolada para o laboratório kind |
 | `infra/local/database/` | Local | PostgreSQL persistente e Job de migrações no kind existente |
+| `infra/local/addons/` | Local | Traefik e metrics-server por Helm no kind existente |
 
 As raízes são independentes. O Terraform não carrega automaticamente configurações das subpastas. Execute sempre com `-chdir` explícito e não reutilize arquivos de estado ou variáveis entre ambientes.
 
@@ -14,5 +15,7 @@ A raiz AWS permaneceu em `infra/` para preservar os caminhos e estados existente
 Em `infra/local/`, o Terraform cria um cluster kind com um control plane e um worker, usando Docker local e kubeconfig dedicado. Consulte [as instruções do laboratório](local/README.md). Essa raiz não usa providers ou recursos AWS.
 
 O banco possui [raiz própria](local/database/README.md), inicializada separadamente após criar o cluster. Seu destroy preserva o namespace e o PVC; destruir o cluster remove o armazenamento local. Não execute apply do banco antes de verificar o kubeconfig e contexto dedicados.
+
+Os [addons locais](local/addons/README.md) também têm estado independente. Instale-os antes do deploy da aplicação com Ingress/HPA. Sua remoção desativa a entrada HTTP e as métricas usadas pelo HPA, mas não remove cluster, banco ou aplicação.
 
 Estados, variáveis reais e arquivos gerados não devem ser versionados. Não execute `apply` ou `destroy` na raiz AWS para validar a configuração local.

@@ -3,7 +3,6 @@ kind: Deployment
 metadata:
   name: oficina-api
 spec:
-  replicas: 1
   template:
     spec:
       containers:

@@ -173,7 +173,7 @@ Copy-Item k8s/local/secret.env.example k8s/local/secret.env
 kubectl kustomize k8s/local
 ```
 
-`secret.env` é ignorado pelo Git. A saída renderizada contém os valores do Secret codificados; não a publique. Esse comando não acessa o cluster e não realiza deploy. Prepare o banco com [sua raiz Terraform](infra/local/database/README.md) e mantenha as credenciais iguais às do Secret da aplicação. Execute [o script de build e deploy](k8s/local/README.md) para carregar uma imagem exclusiva nos nós e aguardar o rollout. Ingress e escala locais serão preparados nas etapas seguintes.
+`secret.env` é ignorado pelo Git. A saída renderizada contém os valores do Secret codificados; não a publique. Esse comando não acessa o cluster e não realiza deploy. Prepare o banco com [sua raiz Terraform](infra/local/database/README.md) e mantenha as credenciais iguais às do Secret da aplicação. Instale [Traefik e metrics-server](infra/local/addons/README.md) e execute [o script de build e deploy](k8s/local/README.md). O Ingress atende HTTP em loopback e o HPA ajusta de 2 a 5 réplicas por CPU.
 
 ## Deploy no Kubernetes
 
