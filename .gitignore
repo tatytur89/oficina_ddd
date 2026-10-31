@@ -17,6 +17,10 @@ infra/local/database/terraform.tfvars
 infra/local/addons/.terraform/
 infra/local/addons/terraform.tfvars
 infra/local/.generated/
+infra/ci/.terraform/
+infra/ci/.generated/
+infra/ci/terraform.tfvars
+k8s/ci-generated/
 infra/terraform.tfvars
 infra/addons/terraform.tfvars
 infra/local/terraform.tfvars

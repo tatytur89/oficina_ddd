@@ -1,13 +1,7 @@
-name: CD Pipeline
+name: Deploy AWS manual
 
 on:
-  workflow_run:
-    workflows:
-      - CI Pipeline
-    types:
-      - completed
-    branches:
-      - main
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -20,10 +14,6 @@ env:
 jobs:
   deploy:
     name: Publish image and deploy
-    if: >-
-      github.event.workflow_run.conclusion == 'success' &&
-      github.event.workflow_run.event == 'push' &&
-      github.event.workflow_run.head_branch == 'main'
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -32,7 +22,7 @@ jobs:
       - name: Checkout tested commit
         uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.workflow_run.head_sha }}
+          ref: ${{ github.sha }}
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -51,9 +41,9 @@ jobs:
           file: ./Dockerfile
           push: true
           build-args: |
-            APP_COMMIT_SHA=${{ github.event.workflow_run.head_sha }}
+            APP_COMMIT_SHA=${{ github.sha }}
           tags: |
-            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:sha-${{ github.event.workflow_run.head_sha }}
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:sha-${{ github.sha }}
             ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
           cache-from: type=gha
           cache-to: type=gha,mode=max
@@ -77,7 +67,7 @@ jobs:
 
       - name: Apply AWS manifests with tested image
         env:
-          IMAGE: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:sha-${{ github.event.workflow_run.head_sha }}
+          IMAGE: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:sha-${{ github.sha }}
         run: |
           kubectl set image --local=true -f k8s/base/deployment.yaml \
             oficina-api="$IMAGE" \

@@ -166,7 +166,7 @@ try {
     Assert-Check ($composeProfile -eq 'docker') 'Compose selects its isolated development Spring profile'
     $workflow = Get-Content -LiteralPath (Join-Path $repoRoot '.github/workflows/cd-pipeline.yml') -Raw
     Assert-Check ($workflow -match 'k8s/aws' -and $workflow -notmatch 'k8s/local') 'CD targets only the AWS overlay'
-    Assert-Check ($workflow -match 'set image' -and $workflow -match 'sha-' -and $workflow -match 'head_sha') 'CD keeps image replacement tied to the tested commit'
+    Assert-Check ($workflow -match 'set image' -and $workflow -match 'sha-' -and $workflow -match 'github\.sha|head_sha') 'CD keeps image replacement tied to its selected commit'
 
     foreach ($path in @('k8s/local/secret.env', 'k8s/aws/secret.yaml', 'infra/local/terraform.tfstate', 'infra/local/terraform.tfvars', 'infra/local/.terraform/providers/placeholder',
             'infra/local/database/terraform.tfstate', 'infra/local/database/terraform.tfvars', 'infra/local/database/.terraform/providers/placeholder', 'infra/local/database/database.tfplan',

@@ -1,5 +1,7 @@
 # Deploy da aplicação no kind
 
+A conta SMTP de avaliação está configurada no arquivo versionado `mail.env`. O script de deploy do namespace principal cria/atualiza `oficina-mail-secret` automaticamente. O modelo enviado inclui HTML/CSS e uma alternativa em texto simples. [Configuração e comportamento dos avisos](../../docs/EMAIL_STATUS.md).
+
 Prepare primeiro o [cluster](../../infra/local/README.md), o [PostgreSQL com migrações](../../infra/local/database/README.md) e os [addons de entrada e métricas](../../infra/local/addons/README.md). Use Windows PowerShell 5.1+, Git, Docker, kind, kubectl e `tar` no PATH. O `tar` do Windows é usado para conferir a configuração da imagem no arquivo carregado nos nós.
 
 ## Build e deploy

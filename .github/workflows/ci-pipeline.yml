@@ -4,17 +4,28 @@ on:
   pull_request:
     branches:
       - main
+      - dev
   push:
     branches:
       - main
+      - dev
+  workflow_dispatch:
 
 permissions:
   contents: read
 
+concurrency:
+  group: local-ci-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  APP_NOTIFICATIONS_EMAIL_ENABLED: 'false'
+
 jobs:
   verify:
     name: Verify
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -37,3 +48,89 @@ jobs:
             echo "::notice::NVD_API_KEY is not configured; skipping OWASP Dependency-Check."
             ./mvnw -B verify -Ddependency-check.skip=true
           fi
+
+      - name: Test reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-reports-${{ github.run_id }}
+          path: |
+            target/surefire-reports/*.xml
+            target/failsafe-reports/*.xml
+            target/site/jacoco/
+          if-no-files-found: ignore
+          retention-days: 7
+
+  local-delivery:
+    name: Deliver to ephemeral Kubernetes
+    needs: verify
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    outputs:
+      image: ${{ steps.delivery.outputs.image }}
+      commit: ${{ steps.delivery.outputs.commit }}
+    env:
+      KIND_EXPERIMENTAL_PROVIDER: docker
+      OFICINA_NAME: oficina-local-ci
+      TF_IN_AUTOMATION: 'true'
+      TF_INPUT: 'false'
+      TF_VAR_context: kind-oficina-local-ci
+      TF_VAR_namespace: oficina-local
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.17.1
+          terraform_wrapper: false
+      - name: Install pinned Kubernetes tools
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd "$RUNNER_TEMP"
+          curl -fsSLo kind-linux-amd64 https://kind.sigs.k8s.io/dl/v0.33.0/kind-linux-amd64
+          curl -fsSLo kind-linux-amd64.sha256sum https://kind.sigs.k8s.io/dl/v0.33.0/kind-linux-amd64.sha256sum
+          sha256sum --check kind-linux-amd64.sha256sum
+          sudo install -m 0755 kind-linux-amd64 /usr/local/bin/kind
+          curl -fsSLo kubectl https://dl.k8s.io/release/v1.34.1/bin/linux/amd64/kubectl
+          curl -fsSLo kubectl.sha256 https://dl.k8s.io/release/v1.34.1/bin/linux/amd64/kubectl.sha256
+          printf '%s  kubectl\n' "$(cat kubectl.sha256)" | sha256sum --check
+          sudo install -m 0755 kubectl /usr/local/bin/kubectl
+      - name: Generate ephemeral credentials
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import os, secrets
+          values = {
+              'TF_VAR_database_password': secrets.token_hex(24),
+              'CI_JWT_SECRET': secrets.token_hex(48),
+              'CI_ADMIN_PASSWORD': secrets.token_hex(24),
+              'OFICINA_ROOT': os.environ['GITHUB_WORKSPACE'] + '/infra/ci',
+              'TF_VAR_kubeconfig_path': os.environ['GITHUB_WORKSPACE'] + '/infra/ci/.generated/kubeconfig',
+          }
+          with open(os.environ['GITHUB_ENV'], 'a', encoding='utf-8') as target:
+              for name, value in values.items():
+                  if name in ('TF_VAR_database_password', 'CI_JWT_SECRET', 'CI_ADMIN_PASSWORD'):
+                      print('::add-mask::' + value)
+                  target.write(name + '=' + value + '\n')
+          PY
+      - name: Build image and deliver
+        id: delivery
+        shell: bash
+        run: bash infra/ci/scripts/deliver.sh
+      - name: Capture nonsecret evidence
+        if: always()
+        continue-on-error: true
+        shell: bash
+        run: bash infra/ci/scripts/evidence.sh
+      - name: Destroy ephemeral resources
+        if: always()
+        shell: bash
+        run: bash infra/ci/scripts/cleanup.sh
+      - name: Publish deployment evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: local-delivery-${{ github.run_id }}
+          path: ${{ runner.temp }}/oficina-ci-evidence/
+          if-no-files-found: ignore
+          retention-days: 7

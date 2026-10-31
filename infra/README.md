@@ -7,6 +7,7 @@
 | `infra/local/` | Local | Raiz isolada para o laboratório kind |
 | `infra/local/database/` | Local | PostgreSQL persistente e Job de migrações no kind existente |
 | `infra/local/addons/` | Local | Traefik e metrics-server por Helm no kind existente |
+| `infra/ci/` | Runner Linux | Cluster kind temporário e independente para CI/CD |
 
 As raízes são independentes. O Terraform não carrega automaticamente configurações das subpastas. Execute sempre com `-chdir` explícito e não reutilize arquivos de estado ou variáveis entre ambientes.
 
