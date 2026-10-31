@@ -6,6 +6,49 @@ Projeto Spring Boot desenvolvido para o Tech Challenge da FIAP.
 
 Sistema de gestão para uma oficina mecânica, cobrindo cadastro de clientes, veículos, serviços e peças, além do fluxo completo de ordens de serviço (criação, diagnóstico, orçamento, execução e entrega). Aplicação Java com Spring Boot, usando Maven Wrapper para facilitar a execução sem precisar instalar Maven globalmente.
 
+## Objetivos da Fase 2
+
+Evoluir a aplicação da Fase 1 com arquitetura hexagonal, testes dos fluxos críticos, abertura de OS com itens, decisão externa de orçamento e fila operacional por prioridade e antiguidade. A infraestrutura usa Docker, Kubernetes com escalabilidade por CPU, Terraform para cluster e banco e pipeline de build, testes, imagem, migrações e deploy. As mudanças de status podem gerar avisos SMTP em HTML após o commit da transação.
+
+O ambiente escolhido para reprodução e avaliação é **local, com kind**, sem exigir conta AWS. A configuração AWS permanece disponível como alternativa manual.
+
+## Arquitetura da solução e fluxo de deploy
+
+![Arquitetura local, componentes e fluxo CI/CD](docs/arquitetura-local.svg)
+
+[Abrir o desenho completo](docs/arquitetura-local.svg) · [Fonte Mermaid editável](docs/arquitetura-local.mmd).
+
+O cliente acessa `127.0.0.1:8090` com `Host: oficina.local`. Traefik encaminha para o Service e os Pods Spring Boot. O HPA usa métricas reais do Metrics Server e controla de duas a cinco réplicas. Os adaptadores JPA acessam PostgreSQL com PVC; um Job aplica o schema versionado. Após confirmar uma mudança de status, o adaptador SMTP envia HTML e texto alternativo ao cliente. O domínio permanece separado desses mecanismos.
+
+O fluxo de entrega é: **checkout → build/testes → imagem Docker → Terraform/kind → imagem nos nós → Terraform/PostgreSQL e migrações → Terraform/addons → Secrets/ConfigMap e manifests → rollout da API com Ingress/HPA → limpeza do ambiente CI**. O cluster de avaliação na máquina e o cluster temporário do runner têm estados independentes.
+
+## Início rápido para avaliação
+
+```bash
+git clone --branch isac https://github.com/tatytur89/oficina_ddd.git
+cd oficina_ddd
+docker compose up --build
+```
+
+- Swagger: `http://localhost:8089/swagger-ui/index.html`.
+- Login Compose: `POST /api/v1/auth/login`, corpo `{"usuario":"admin","senha":"admin123"}`; use o token Bearer nas rotas administrativas.
+- [Collection completa Postman](postman/Oficina-DDD.postman_collection.json).
+- A conta SMTP de avaliação é carregada de `k8s/local/mail.env`; cadastre no cliente o destinatário autorizado e abra/altere uma OS para receber o aviso. [Configuração e comportamento do e-mail HTML](docs/EMAIL_STATUS.md).
+
+Para Kubernetes local, siga nesta ordem: [cluster Terraform](infra/local/README.md), [PostgreSQL e migrações](infra/local/database/README.md), [Traefik e métricas](infra/local/addons/README.md) e [deploy da aplicação](k8s/local/README.md). O script de deploy carrega a configuração SMTP de avaliação automaticamente no namespace principal. O Docker Compose precisa de suporte a `env_file.required` (Compose 2.24 ou superior).
+
+## CI/CD
+
+O workflow [CI Pipeline](.github/workflows/ci-pipeline.yml) contém build Java, testes automatizados, construção da imagem e entrega em um cluster kind temporário Linux. O runner usa a raiz [infra/ci](infra/ci/README.md), reaproveita os módulos de banco/addons e aplica o overlay local com a imagem do commit. O deploy do banco e a execução do Job de migrações precedem o rollout da API. A coleta de diagnóstico e a limpeza são automáticas.
+
+Os gatilhos automáticos atendem pushes e pull requests para `main` e `dev`; a execução manual permite selecionar outra referência. A branch `isac` não dispara testes automaticamente a cada push. A pipeline mantém SMTP desabilitado para não enviar e-mails durante a automação. O workflow [Deploy AWS manual](.github/workflows/cd-pipeline.yml) é uma alternativa opt-in, dependente de infraestrutura e `KUBE_CONFIG` próprios; não é disparado pela entrega local.
+
+As alterações finais de CI/CD e documentação foram implementadas sem executar testes ou disparar a pipeline, conforme solicitado. A configuração deve ser executada no GitHub Actions para gerar a evidência da entrega automática; esta documentação não apresenta uma execução ainda não realizada como aprovada.
+
+## Entrega acadêmica
+
+O vídeo de até 15 minutos deve mostrar deploy, execução do CI/CD, consumo das APIs e escala automática. Seu link público ou não listado no YouTube/Vimeo deve ser incluído aqui antes da entrega. O PDF do portal deve conter repositório, desenho e vídeo. O compartilhamento com `soat-architecture` deve ser confirmado pelo responsável no GitHub.
+
 ## Arquitetura
 
 O projeto segue arquitetura hexagonal (ports & adapters) com Domain-Driven Design:
@@ -16,6 +59,7 @@ O projeto segue arquitetura hexagonal (ports & adapters) com Domain-Driven Desig
 - `adapters/in/web` — controllers REST, DTOs e mappers
 - `adapters/out/persistence` — adaptadores JPA/PostgreSQL
 - `adapters/out/security` — autenticação JWT
+- `adapters/out/notification` — publicação transacional e envio SMTP de status
 
 ## Ambientes de execução
 
@@ -177,7 +221,7 @@ kubectl kustomize k8s/local
 
 ## Deploy no Kubernetes
 
-Os manifests em `k8s/aws/` publicam a API no EKS usando um PostgreSQL externo e o perfil `aws`. Para deploy automatizado, cada push em `main` que conclui o CI com sucesso dispara o workflow **CD Pipeline**, que publica a imagem com a tag `sha-<commit>` no GHCR e aplica a configuração AWS com essa imagem. Configure o secret `KUBE_CONFIG` nas configurações do repositório com o conteúdo do kubeconfig. A imagem do GHCR precisa ser pública para que o cluster possa baixá-la.
+Os manifests em `k8s/aws/` publicam a API no EKS usando PostgreSQL externo e o perfil `aws`. A alternativa **Deploy AWS manual** é iniciada explicitamente no GitHub Actions, publica a imagem `sha-<commit>` no GHCR e aplica o overlay AWS. Configure `KUBE_CONFIG` para seu cluster e prepare banco, schema e Secrets antes de acioná-la. A imagem precisa estar acessível ao cluster. O fluxo CI/CD principal de avaliação usa kind temporário e provisiona o banco automaticamente.
 
 Antes do primeiro deploy automatizado, crie o namespace `oficina-api` e o Secret `oficina-api-secret` no cluster. O workflow verifica se esse Secret existe e não aplica `secret.yaml.example`, que contém apenas valores placeholder.
 
@@ -245,7 +289,7 @@ kubectl --context $eksContext get ingress -n oficina-api oficina-api
 
 Não coloque credenciais em `terraform.tfvars`, no Git ou na linha de comando. Se a imagem GHCR for privada, crie um `imagePullSecret` no namespace e referencie-o no Deployment.
 
-O RDS é criado sem tabelas. Como o perfil `aws` usa `spring.jpa.hibernate.ddl-auto=validate`, inicialize o schema por uma migração/script SQL aprovado antes de iniciar os pods. O SQL incremental existente não cria o schema inicial; migrações completas ainda serão implementadas.
+O RDS é criado sem tabelas. Como o perfil `aws` usa `spring.jpa.hibernate.ddl-auto=validate`, prepare o schema antes dos Pods. O schema inicial completo está em `src/main/resources/db/migration/V001__initial_schema.sql` e o runner versionado em `database/migrate.sh`; forneça as variáveis `PGHOST`, `PGPORT`, `PGDATABASE`, `PGUSER` e `PGPASSWORD` em um ambiente com acesso ao RDS. O SQL `docs/sql/orcamento-decisao.sql` serve apenas para atualização incremental de bancos anteriores. O deploy AWS manual pressupõe essa preparação; a pipeline local executa o Job automaticamente.
 
 Por padrão, a configuração usa nós `t3.medium`, RDS `db.t4g.micro`, um NAT Gateway e banco Single-AZ; esses recursos e o endpoint EKS geram cobrança contínua na AWS. A aplicação usa a senha mestra do RDS neste exemplo; para produção, crie um usuário PostgreSQL exclusivo com privilégios mínimos e use suas credenciais no Secret. O RDS tem proteção contra exclusão habilitada; para removê-lo intencionalmente, altere `database_deletion_protection` para `false`, aplique essa mudança e só então destrua a infraestrutura. Antes de destruir o cluster, remova o Ingress/ALB e o controller (`kubectl --context $eksContext delete ingress -n oficina-api oficina-api` e `terraform -chdir=infra/addons destroy`, informando os mesmos valores `-var` usados ao aplicar); o snapshot final do banco permanece na AWS e pode continuar gerando custo. A escalabilidade horizontal é feita pelo `k8s/aws/hpa.yaml`: o HPA mantém de 2 a 5 réplicas conforme a CPU (alvo de 70% do `request`), usando o metrics-server instalado por `infra/addons/`. O Deployment não fixa `replicas`, para não conflitar com o HPA. Para testes curtos, use o perfil `infra/estudante.tfvars.example` (mantém os nós padrão; apenas desliga a proteção contra exclusão e o snapshot final do RDS) e, ao terminar, rode `./scripts/destroy.sh` (bash): ele remove o Ingress e espera o ALB sumir, destrói o controller e a infraestrutura principal e lista qualquer recurso que tenha ficado cobrando. O ALB é HTTP; configure certificado ACM e TLS antes de expor dados reais. O estado local do Terraform deve ser protegido e migrado para backend remoto criptografado/lock antes de uso por equipe ou produção.
 
