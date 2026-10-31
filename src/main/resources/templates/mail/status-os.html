@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Atualização da OS #{{OS_ID}}</title>
+</head>
+<body style="margin:0;padding:0;background-color:#eef2f4;font-family:Arial,Helvetica,sans-serif;color:#142638;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="width:100%;background-color:#eef2f4;">
+    <tr><td align="center" style="padding:24px 12px;">
+      <!--[if mso]><table role="presentation" width="600" cellpadding="0" cellspacing="0" border="0"><tr><td><![endif]-->
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="width:100%;max-width:600px;table-layout:fixed;background-color:#ffffff;border-collapse:collapse;">
+        <tr><td style="padding:26px 24px;background-color:#142638;border-bottom:4px solid #e49b42;">
+          <p style="margin:0;color:#ffffff;font-size:19px;font-weight:bold;letter-spacing:2px;">OFICINA FIAP</p>
+          <p style="margin:8px 0 0;color:#cbd7e1;font-size:12px;letter-spacing:1px;">ACOMPANHAMENTO DO SEU VEÍCULO</p>
+        </td></tr>
+        <tr><td style="padding:28px 24px 18px;">
+          <h1 style="margin:0 0 12px;font-size:25px;line-height:32px;font-weight:bold;">Atualização do atendimento</h1>
+          <p style="margin:0;color:#536675;font-size:15px;line-height:23px;">Há uma nova etapa na sua ordem de serviço.</p>
+        </td></tr>
+        <tr><td style="padding:0 24px;">
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#eef2f4;border-left:4px solid #2b5cab;">
+            <tr><td style="padding:18px 16px;">
+              <p style="margin:0 0 8px;color:#536675;font-size:11px;letter-spacing:1px;">ORDEM DE SERVIÇO</p>
+              <p style="margin:0 0 12px;color:#142638;font-size:29px;line-height:34px;font-weight:bold;">OS #{{OS_ID}}</p>
+              <p style="margin:0;color:#2b5cab;font-size:19px;line-height:26px;font-weight:bold;">{{STATUS}}</p>
+            </td></tr>
+          </table>
+        </td></tr>
+        <tr><td style="padding:24px 24px 0;">
+          <p style="margin:0 0 16px;color:#142638;font-size:14px;font-weight:bold;">Fase atual: {{CURRENT_STEP}}/6</p>
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="table-layout:fixed;width:100%;">
+            <tr>
+              <td width="16%" valign="top" align="center" style="padding:0 2px;">
+                <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr><td align="center" style="padding:10px 0;background-color:{{STEP_1_BACKGROUND}};color:{{STEP_1_COLOR}};font-size:14px;font-weight:bold;">1</td></tr></table>
+                <p style="margin:8px 0 0;color:#536675;font-size:10px;line-height:14px;word-break:break-word;">Recebida</p>
+              </td>
+              <td width="17%" valign="top" align="center" style="padding:0 2px;">
+                <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr><td align="center" style="padding:10px 0;background-color:{{STEP_2_BACKGROUND}};color:{{STEP_2_COLOR}};font-size:14px;font-weight:bold;">2</td></tr></table>
+                <p style="margin:8px 0 0;color:#536675;font-size:10px;line-height:14px;word-break:break-word;">Diagnóstico</p>
+              </td>
+              <td width="17%" valign="top" align="center" style="padding:0 2px;">
+                <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr><td align="center" style="padding:10px 0;background-color:{{STEP_3_BACKGROUND}};color:{{STEP_3_COLOR}};font-size:14px;font-weight:bold;">3</td></tr></table>
+                <p style="margin:8px 0 0;color:#536675;font-size:10px;line-height:14px;word-break:break-word;">Aguardando aprovação</p>
+              </td>
+              <td width="17%" valign="top" align="center" style="padding:0 2px;">
+                <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr><td align="center" style="padding:10px 0;background-color:{{STEP_4_BACKGROUND}};color:{{STEP_4_COLOR}};font-size:14px;font-weight:bold;">4</td></tr></table>
+                <p style="margin:8px 0 0;color:#536675;font-size:10px;line-height:14px;word-break:break-word;">Em execução</p>
+              </td>
+              <td width="17%" valign="top" align="center" style="padding:0 2px;">
+                <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr><td align="center" style="padding:10px 0;background-color:{{STEP_5_BACKGROUND}};color:{{STEP_5_COLOR}};font-size:14px;font-weight:bold;">5</td></tr></table>
+                <p style="margin:8px 0 0;color:#536675;font-size:10px;line-height:14px;word-break:break-word;">Finalizada</p>
+              </td>
+              <td width="16%" valign="top" align="center" style="padding:0 2px;">
+                <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr><td align="center" style="padding:10px 0;background-color:{{STEP_6_BACKGROUND}};color:{{STEP_6_COLOR}};font-size:14px;font-weight:bold;">6</td></tr></table>
+                <p style="margin:8px 0 0;color:#536675;font-size:10px;line-height:14px;word-break:break-word;">Entregue</p>
+              </td>
+            </tr>
+          </table>
+        </td></tr>
+        <tr><td style="padding:24px;">
+          <p style="margin:0;font-size:15px;line-height:24px;color:#142638;">{{MESSAGE}}</p>
+        </td></tr>
+        <tr><td style="padding:20px 24px;border-top:1px solid #dbe3e9;background-color:#f7f9fa;">
+          <p style="margin:0;color:#536675;font-size:12px;line-height:19px;">Para esclarecer dúvidas sobre o atendimento, fale com a equipe da oficina.</p>
+          <p style="margin:12px 0 0;color:#142638;font-size:12px;font-weight:bold;">Oficina FIAP · Cuidado em cada etapa.</p>
+        </td></tr>
+      </table>
+      <!--[if mso]></td></tr></table><![endif]-->
+    </td></tr>
+  </table>
+</body>
+</html>

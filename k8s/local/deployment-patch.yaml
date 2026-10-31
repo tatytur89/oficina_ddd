@@ -8,3 +8,11 @@ spec:
       containers:
         - name: oficina-api
           imagePullPolicy: Never
+          envFrom:
+            - configMapRef:
+                name: oficina-api-config
+            - secretRef:
+                name: oficina-api-secret
+            - secretRef:
+                name: oficina-mail-secret
+                optional: true

@@ -9,6 +9,7 @@ import br.com.fiap.ports.in.ServicoUseCase;
 import br.com.fiap.ports.out.ClienteRepositoryPort;
 import br.com.fiap.ports.out.OrdemServicoRepositoryPort;
 import br.com.fiap.ports.out.VeiculoRepositoryPort;
+import br.com.fiap.ports.out.StatusOsNotificationPort;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -31,6 +32,7 @@ class FilaOrdemServicoTest {
     @Mock VeiculoRepositoryPort veiculos;
     @Mock ServicoUseCase servicos;
     @Mock PecaUseCase pecas;
+    @Mock StatusOsNotificationPort notifications;
     @InjectMocks OrdemServicoService service;
 
     private final LocalDateTime abertura = LocalDateTime.of(2026, 10, 1, 10, 0);

@@ -26,6 +26,7 @@ class DecisaoOrcamentoServiceTest {
     @Mock VeiculoRepositoryPort veiculos;
     @Mock ServicoUseCase servicos;
     @Mock PecaUseCase pecas;
+    @Mock StatusOsNotificationPort notifications;
     @InjectMocks OrdemServicoService service;
 
     private OrdemServico aguardando() {

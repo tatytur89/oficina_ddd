@@ -5,6 +5,9 @@ services:
       dockerfile: Dockerfile
     ports:
       - "8089:8080"
+    env_file:
+      - path: ${SMTP_ENV_FILE:-k8s/local/mail.env}
+        required: false
     environment:
       SPRING_PROFILES_ACTIVE: docker
       SPRING_JPA_HIBERNATE_DDL_AUTO: update

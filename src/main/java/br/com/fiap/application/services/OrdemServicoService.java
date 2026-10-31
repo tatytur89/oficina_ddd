@@ -10,6 +10,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import br.com.fiap.application.exceptions.ResourceNotFoundException;
 import br.com.fiap.domain.entities.OrdemServico;
+import br.com.fiap.domain.entities.Cliente;
 import br.com.fiap.domain.entities.Peca;
 import br.com.fiap.domain.entities.PecaOS;
 import br.com.fiap.domain.entities.Servico;
@@ -24,6 +25,8 @@ import br.com.fiap.ports.in.TempoMedioExecucao;
 import br.com.fiap.ports.out.ClienteRepositoryPort;
 import br.com.fiap.ports.out.OrdemServicoRepositoryPort;
 import br.com.fiap.ports.out.VeiculoRepositoryPort;
+import br.com.fiap.ports.out.StatusOsNotification;
+import br.com.fiap.ports.out.StatusOsNotificationPort;
 
 @Service
 public class OrdemServicoService implements OrdemServicoUseCase {
@@ -33,23 +36,26 @@ public class OrdemServicoService implements OrdemServicoUseCase {
     private final VeiculoRepositoryPort veiculoRepositoryPort;
     private final ServicoUseCase servicoUseCase;
     private final PecaUseCase pecaUseCase;
+    private final StatusOsNotificationPort notificationPort;
 
     public OrdemServicoService(OrdemServicoRepositoryPort osRepositoryPort,
                                 ClienteRepositoryPort clienteRepositoryPort,
                                 VeiculoRepositoryPort veiculoRepositoryPort,
                                 ServicoUseCase servicoUseCase,
-                                PecaUseCase pecaUseCase) {
+                                PecaUseCase pecaUseCase,
+                                StatusOsNotificationPort notificationPort) {
         this.osRepositoryPort = osRepositoryPort;
         this.clienteRepositoryPort = clienteRepositoryPort;
         this.veiculoRepositoryPort = veiculoRepositoryPort;
         this.servicoUseCase = servicoUseCase;
         this.pecaUseCase = pecaUseCase;
+        this.notificationPort = notificationPort;
     }
 
     @Override
     @Transactional
     public OrdemServico criarOS(CriarOrdemServicoCommand command) {
-        clienteRepositoryPort.buscarPorId(command.clienteId())
+        Cliente cliente = clienteRepositoryPort.buscarPorId(command.clienteId())
                 .orElseThrow(() -> new ResourceNotFoundException("Cliente não encontrado com ID: " + command.clienteId()));
 
         Veiculo veiculo = veiculoRepositoryPort.buscarPorId(command.veiculoId())
@@ -66,7 +72,9 @@ public class OrdemServicoService implements OrdemServicoUseCase {
             novaOS.registrarPecaSolicitada(pecaUseCase.buscarPorId(item.id()), item.quantidade());
         }
 
-        return osRepositoryPort.salvar(novaOS);
+        OrdemServico salva = osRepositoryPort.salvar(novaOS);
+        notificarStatus(salva, cliente);
+        return salva;
     }
 
     @Override
@@ -75,6 +83,7 @@ public class OrdemServicoService implements OrdemServicoUseCase {
         OrdemServico os = osRepositoryPort.buscarPorIdParaAtualizacao(osId)
                 .orElseThrow(() -> new ResourceNotFoundException("OS não encontrada com ID: " + osId));
 
+        StatusOS anterior = os.getStatus();
         os.transicionarPara(StatusOS.EM_DIAGNOSTICO);
 
         if (dataPrevistaEntrega != null) {
@@ -95,7 +104,7 @@ public class OrdemServicoService implements OrdemServicoUseCase {
             }
         }
 
-        return osRepositoryPort.salvar(os);
+        return salvarComAvisoDeStatus(os, anterior);
     }
 
     @Override
@@ -177,9 +186,10 @@ public class OrdemServicoService implements OrdemServicoUseCase {
         OrdemServico os = osRepositoryPort.buscarPorIdParaAtualizacao(id)
             .orElseThrow(() -> new ResourceNotFoundException("OS não encontrada com ID: " + id));
 
+        StatusOS anterior = os.getStatus();
         os.transicionarPara(novoStatus);
 
-        return osRepositoryPort.salvar(os);
+        return salvarComAvisoDeStatus(os, anterior);
     }
 
     @Override
@@ -188,8 +198,9 @@ public class OrdemServicoService implements OrdemServicoUseCase {
         OrdemServico os = osRepositoryPort.buscarPorIdParaAtualizacao(id)
             .orElseThrow(() -> new ResourceNotFoundException("OS não encontrada com ID: " + id));
 
+        StatusOS anterior = os.getStatus();
         os.enviarOrcamento();
-        return osRepositoryPort.salvar(os);
+        return salvarComAvisoDeStatus(os, anterior);
     }
 
     @Override
@@ -209,13 +220,30 @@ public class OrdemServicoService implements OrdemServicoUseCase {
     }
 
     private OrdemServico aplicarDecisao(OrdemServico os, String chave, long versaoOrcamento, boolean aprovado) {
+        StatusOS anterior = os.getStatus();
         if (!os.decidirOrcamento(chave, versaoOrcamento, aprovado)) {
             return os;
         }
         if (aprovado) {
             baixarEstoqueDosItens(os);
         }
-        return osRepositoryPort.salvar(os);
+        return salvarComAvisoDeStatus(os, anterior);
+    }
+
+    private OrdemServico salvarComAvisoDeStatus(OrdemServico os, StatusOS anterior) {
+        OrdemServico salva = osRepositoryPort.salvar(os);
+        if (salva.getStatus() != anterior) {
+            clienteRepositoryPort.buscarPorId(salva.getClienteId())
+                    .ifPresent(cliente -> notificarStatus(salva, cliente));
+        }
+        return salva;
+    }
+
+    private void notificarStatus(OrdemServico os, Cliente cliente) {
+        String email = cliente.getEmail();
+        if (email != null && !email.isBlank()) {
+            notificationPort.notificar(new StatusOsNotification(os.getId(), os.getStatus(), email));
+        }
     }
 
     @Override

@@ -8,6 +8,7 @@ k8s/secret.yaml
 k8s/aws/secret.yaml
 k8s/aws/deployment-image-patch.yaml
 k8s/local/secret.env
+k8s/local/mail-personal.env
 infra/.terraform/
 infra/addons/.terraform/
 infra/local/.terraform/

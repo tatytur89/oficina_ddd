@@ -478,7 +478,7 @@ Dentro de cada status, as OS são ordenadas por data de abertura crescente (mais
 
 O histórico continua disponível nas consultas por ID, cliente, status e período. Por exemplo, `GET /api/v1/ordens-servico/status/FINALIZADA` permite consultar OS finalizadas. A métrica de tempo médio também continua considerando as OS concluídas, independentemente do filtro da fila.
 
-A resposta autenticada da OS (criar, listar, buscar por ID) inclui o campo `chaveAcesso` — é essa chave que a equipe administrativa repassa ao cliente (não há integração de e-mail/SMS no projeto) para ele acessar a página pública de acompanhamento descrita abaixo.
+A resposta autenticada da OS (criar, listar, buscar por ID) inclui o campo `chaveAcesso`, que a equipe administrativa repassa ao cliente para acessar a página pública de acompanhamento. A [integração SMTP de avisos de status](docs/EMAIL_STATUS.md) envia o ID e o status após o commit, sem incluir essa chave ou outros tokens. O envio é habilitado por configuração externa e permanece desabilitado por padrão.
 
 Exemplo de corpo (criar OS):
 

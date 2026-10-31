@@ -88,7 +88,11 @@ function Assert-References([string[]]$Documents, [string]$Deployment, [bool]$Gen
     Assert-Check ($secretRefs.Count -gt 0) 'Deployment references an application Secret'
     foreach ($ref in $secretRefs) {
         if ($GeneratedSecret) {
-            Assert-Check ($secretNames -contains $ref.Groups[1].Value) 'Local Secret reference resolves to generated Secret'
+            if ($ref.Groups[1].Value -eq 'oficina-mail-secret') {
+                Assert-Check ($Deployment -match 'name:[ \t]*oficina-mail-secret\r?\n[ \t]+optional:[ \t]*true') 'Local SMTP Secret is optional and supplied separately at runtime'
+            } else {
+                Assert-Check ($secretNames -contains $ref.Groups[1].Value) 'Local Secret reference resolves to generated Secret'
+            }
         } else {
             Assert-Check ($ref.Groups[1].Value -eq 'oficina-api-secret') 'AWS keeps its externally provisioned Secret reference'
         }
@@ -170,7 +174,7 @@ try {
         $ignored = Invoke-Native 'git' @('check-ignore', '--no-index', $path)
         Assert-Check ($ignored.Code -eq 0) "Sensitive or generated path is ignored: $path"
     }
-    foreach ($path in @('k8s/local/secret.env.example', 'k8s/aws/secret.yaml.example', 'infra/local/database/terraform.tfvars.example')) {
+    foreach ($path in @('k8s/local/secret.env.example', 'k8s/local/mail.env', 'k8s/local/mail.env.example', 'k8s/aws/secret.yaml.example', 'infra/local/database/terraform.tfvars.example')) {
         $ignored = Invoke-Native 'git' @('check-ignore', '--no-index', $path)
         Assert-Check ($ignored.Code -eq 1) "Reviewable example remains versionable: $path"
     }

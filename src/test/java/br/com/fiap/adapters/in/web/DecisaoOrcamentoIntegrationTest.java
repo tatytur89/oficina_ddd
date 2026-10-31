@@ -34,6 +34,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 @SpringBootTest(properties = {
+        "app.notifications.email.enabled=false",
         "spring.datasource.url=jdbc:h2:mem:decisao-integracao;DB_CLOSE_DELAY=-1;MODE=PostgreSQL",
         "spring.jpa.hibernate.ddl-auto=create-drop",
         "api.security.token.secret=segredo-exclusivo-dos-testes-de-integracao",

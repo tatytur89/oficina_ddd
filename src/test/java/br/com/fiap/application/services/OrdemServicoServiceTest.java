@@ -24,6 +24,7 @@ import br.com.fiap.ports.in.TempoMedioExecucao;
 import br.com.fiap.ports.out.ClienteRepositoryPort;
 import br.com.fiap.ports.out.OrdemServicoRepositoryPort;
 import br.com.fiap.ports.out.VeiculoRepositoryPort;
+import br.com.fiap.ports.out.StatusOsNotificationPort;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -51,6 +52,9 @@ class OrdemServicoServiceTest {
 
     @Mock
     private PecaUseCase pecaUseCase;
+
+    @Mock
+    private StatusOsNotificationPort notifications;
 
     @InjectMocks
     private OrdemServicoService ordemServicoService;

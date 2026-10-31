@@ -84,6 +84,9 @@ try {
     $databaseSecret = Invoke-Tool 'kubectl' ($namespaceArgs + @('get', 'secret', 'postgres-secret', '-o', 'json')) | ConvertFrom-Json
     $databasePassword = [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String($databaseSecret.data.POSTGRES_PASSWORD))
     if ($values.SPRING_DATASOURCE_PASSWORD -cne $databasePassword) { throw 'Application and PostgreSQL Secret passwords differ.' }
+    if ($Namespace -eq 'oficina-local' -and (Test-Path -LiteralPath (Join-Path $repoRoot 'k8s/local/mail.env'))) {
+        & (Join-Path $PSScriptRoot 'Configure-LocalMail.ps1') -Namespace $Namespace
+    }
 
     if (!$Image) {
         $commit = (Invoke-Tool 'git' @('-C', $repoRoot, 'rev-parse', 'HEAD')).Trim()

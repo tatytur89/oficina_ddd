@@ -29,6 +29,7 @@ class AberturaOrdemServicoTest {
     @Mock VeiculoRepositoryPort veiculoRepositoryPort;
     @Mock ServicoUseCase servicoUseCase;
     @Mock PecaUseCase pecaUseCase;
+    @Mock StatusOsNotificationPort notifications;
     @InjectMocks OrdemServicoService service;
 
     private final Cliente cliente = new Cliente(1L, "Cliente", "12345678909", "cliente@example.com", "11999999999");

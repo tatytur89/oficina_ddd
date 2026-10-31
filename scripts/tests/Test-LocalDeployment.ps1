@@ -141,6 +141,8 @@ try {
     $configMapName=($pods.items[0].spec.containers[0].envFrom|Where-Object{$_.PSObject.Properties.Name -contains 'configMapRef'}).configMapRef.name
     $config=Assert-TestTool 'kubectl' ($nsArgs+@('get','configmap',$configMapName,'-o','json'))|ConvertFrom-Json
     Assert-Check ($config.data.SPRING_PROFILES_ACTIVE -eq 'lab') 'API uses only the local lab profile'
+    $mailSecret=Assert-TestTool 'kubectl' ($nsArgs+@('get','secret','oficina-mail-secret','--ignore-not-found','-o','name'))
+    Assert-Check ([string]::IsNullOrWhiteSpace($mailSecret)) 'Disposable API has no SMTP Secret and uses notifications disabled by default'
     Assert-Check ($config.data.MANAGEMENT_ENDPOINT_HEALTH_GROUP_READINESS_INCLUDE -match 'db') 'Readiness group explicitly includes the database'
     Assert-Check ($pods.items[0].spec.containers[0].image -eq $Image -and $pods.items[0].spec.containers[0].imagePullPolicy -eq 'Never') 'API uses the exact prebuilt local image without registry pulls'
     $listener=New-Object Net.Sockets.TcpListener([Net.IPAddress]::Loopback,0)
@@ -149,6 +151,8 @@ try {
     $baseUrl="http://127.0.0.1:$port"
     $ready=Wait-Health 200
     Assert-Check ($ready.Json.status -eq 'UP') 'API readiness is UP over the private port-forward'
+    $globalHealth=Invoke-Http '/actuator/health'
+    Assert-Check ($globalHealth.Code -eq 200 -and $globalHealth.Json.status -eq 'UP') 'Global application health is HTTP 200 UP without an SMTP Secret or connection'
     Assert-Check ((Assert-Http '/actuator/health/liveness' 200).Json.status -eq 'UP') 'API liveness is UP'
     Assert-Http '/swagger-ui/index.html' 200|Out-Null
     $info=Assert-Http '/api/v1/info' 200
@@ -159,7 +163,7 @@ try {
     Assert-Http '/api/v1/auth/login' 401 'POST' @{usuario=$admin;senha='incorrect-smoke-password'}|Out-Null
     $token=(Assert-Http '/api/v1/auth/login' 200 'POST' @{usuario=$admin;senha=$adminPassword}).Json.dados.token
     Assert-Check (![string]::IsNullOrWhiteSpace($token)) 'Login issues a usable JWT'
-    $cliente=(Assert-Http '/api/v1/clientes' 201 'POST' @{nome='Cliente smoke';documento='12345678909';email='smoke@example.com';telefone='11999999999'} $token).Json.dados
+    $cliente=(Assert-Http '/api/v1/clientes' 201 'POST' @{nome='Cliente smoke';documento='12345678909';email='smoke@test.invalid';telefone='11999999999'} $token).Json.dados
     $veiculo=(Assert-Http '/api/v1/veiculos' 201 'POST' @{marca='Toyota';modelo='Corolla';ano=2022;placa='ABC1D23';clienteId=$cliente.id} $token).Json.dados
     $servico=(Assert-Http '/api/v1/servicos' 201 'POST' @{nome='Revisao smoke';descricao='Revisao';preco=150.25;tipo='REVISAO';tempoEstimadoMinutos=60} $token).Json.dados
     $peca=(Assert-Http '/api/v1/pecas' 201 'POST' @{nome='Filtro';descricao='Filtro smoke';codigo='FSMOKE';preco=45.90;quantidadeEstoque=10;estoqueMinimo=2} $token).Json.dados
@@ -182,6 +186,8 @@ try {
     $fila=(Assert-Http '/api/v1/ordens-servico' 200 'GET' $null $token).Json.dados
     Assert-Check (@($fila|Where-Object{$_.id -eq $os.id}).Count -eq 0) 'Delivered OS is absent from the operational queue'
     Assert-Check ((Assert-Http $base 200 'GET' $null $token).Json.dados.status -eq 'ENTREGUE') 'Delivered OS remains available in history'
+    $apiLogs=Assert-TestTool 'kubectl' ($nsArgs+@('logs','-l','app.kubernetes.io/name=oficina-api','--all-containers=true','--tail=-1'))
+    Assert-Check ($apiLogs -notmatch 'status_os_email_(sent|failed)') 'Complete OS flow makes no SMTP send attempt with notifications disabled'
     try {
         Assert-TestTool 'kubectl' ($nsArgs+@('scale','statefulset/postgres','--replicas=0'))|Out-Null
         Assert-TestTool 'kubectl' ($nsArgs+@('wait','--for=delete','pod/postgres-0','--timeout=120s')) 140|Out-Null
