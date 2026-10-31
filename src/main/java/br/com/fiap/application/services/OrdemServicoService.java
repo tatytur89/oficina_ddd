@@ -268,7 +268,9 @@ public class OrdemServicoService implements OrdemServicoUseCase {
     }
 
     private void baixarEstoqueDosItens(OrdemServico os) {
-        for (PecaOS item : os.getPecas()) {
+        // Ordem consistente reduz deadlocks entre OS com as mesmas pecas.
+        for (PecaOS item : os.getPecas().stream()
+                .sorted(Comparator.comparing(PecaOS::getPecaId)).toList()) {
             pecaUseCase.baixarEstoque(item.getPecaId(), item.getQuantidade());
         }
     }

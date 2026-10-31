@@ -49,6 +49,11 @@ public class PecaPersistenceAdapter implements PecaRepositoryPort {
     }
 
     @Override
+    public Optional<Peca> buscarPorIdParaAtualizacao(Long id) {
+        return jpaRepository.buscarPorIdParaAtualizacao(id).map(this::mapearParaDominio);
+    }
+
+    @Override
     public Optional<Peca> buscarPorCodigo(String codigo) {
         return jpaRepository.findByCodigo(codigo)
                 .map(this::mapearParaDominio);

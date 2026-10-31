@@ -73,6 +73,72 @@ class DecisaoOrcamentoIntegrationTest {
         });
     }
 
+    @Test
+    void duasOrdensConcorrentesNaoPodemConsumirAMesmaUltimaPeca() throws Exception {
+        verificarEstoqueCompartilhado(3, false);
+    }
+
+    @Test
+    void duasOrdensConcorrentesComSaldoDevemPreservarAmbasAsBaixas() throws Exception {
+        verificarEstoqueCompartilhado(5, true);
+    }
+
+    private void verificarEstoqueCompartilhado(int saldoInicial, boolean ambasAprovadas) throws Exception {
+        Fixture primeira = aguardando(false);
+        Fixture segunda = tx.execute(status -> {
+            var peca = pecas.buscarPorId(primeira.pecaId()).orElseThrow();
+            pecas.salvar(new Peca(peca.getId(), peca.getNome(), peca.getDescricao(), peca.getCodigo(),
+                    peca.getPreco(), saldoInicial, peca.getEstoqueMinimo()));
+            String chave = UUID.randomUUID().toString();
+            var os = ordens.salvar(new OrdemServico(null, 1L, 2L, StatusOS.AGUARDANDO_APROVACAO,
+                    LocalDateTime.now(), null, null, "concorrencia", new Preco(100), new Preco(40), new Preco(140),
+                    List.of(new ServicoOS(3L, "Revisao", 1, new Preco(100), new Preco(100))),
+                    List.of(new PecaOS(peca.getId(), peca.getNome(), peca.getCodigo(), 2, peca.getPreco(), new Preco(40))),
+                    chave, null, null, 3L, null));
+            return new Fixture(os.getId(), chave, peca.getId(), null);
+        });
+        var primeiraBaixou = new CountDownLatch(1);
+        var liberarCommit = new CountDownLatch(1);
+        var segundaIniciou = new CountDownLatch(1);
+        try (var executor = Executors.newFixedThreadPool(2)) {
+            var a = executor.submit(() -> tx.execute(status -> {
+                useCase.decidirOrcamento(primeira.id(), primeira.chave(), 3L, true);
+                primeiraBaixou.countDown();
+                try {
+                    if (!liberarCommit.await(10, TimeUnit.SECONDS)) throw new IllegalStateException("Timeout do teste");
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    throw new IllegalStateException(e);
+                }
+                return true;
+            }));
+            try {
+                assertTrue(primeiraBaixou.await(10, TimeUnit.SECONDS));
+                var b = executor.submit(() -> {
+                    segundaIniciou.countDown();
+                    try {
+                        useCase.decidirOrcamento(segunda.id(), segunda.chave(), 3L, true);
+                        return true;
+                    } catch (IllegalStateException e) {
+                        assertTrue(e.getMessage().contains("Estoque insuficiente"));
+                        return false;
+                    }
+                });
+                assertTrue(segundaIniciou.await(5, TimeUnit.SECONDS));
+                assertThrows(java.util.concurrent.TimeoutException.class, () -> b.get(250, TimeUnit.MILLISECONDS));
+                liberarCommit.countDown();
+                assertTrue(a.get(10, TimeUnit.SECONDS));
+                assertEquals(ambasAprovadas, b.get(10, TimeUnit.SECONDS));
+                assertEquals(saldoInicial - (ambasAprovadas ? 4 : 2), estado(primeira).estoque());
+                assertEquals(StatusOS.EM_EXECUCAO, estado(primeira).status());
+                assertEquals(ambasAprovadas ? StatusOS.EM_EXECUCAO : StatusOS.AGUARDANDO_APROVACAO,
+                        estado(segunda).status());
+            } finally {
+                liberarCommit.countDown();
+            }
+        }
+    }
+
     private Estado estado(Fixture f) {
         return tx.execute(status -> {
             var os = ordens.buscarPorId(f.id()).orElseThrow();

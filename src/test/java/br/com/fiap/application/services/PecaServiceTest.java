@@ -137,7 +137,7 @@ class PecaServiceTest {
     @DisplayName("Deve baixar estoque com sucesso")
     void deveBaixarEstoque() {
         Peca peca = novaPeca(1L, "FIL001", 50, 10);
-        when(repositoryPort.buscarPorId(1L)).thenReturn(Optional.of(peca));
+        when(repositoryPort.buscarPorIdParaAtualizacao(1L)).thenReturn(Optional.of(peca));
 
         pecaService.baixarEstoque(1L, 5);
 
@@ -148,7 +148,7 @@ class PecaServiceTest {
     @Test
     @DisplayName("Deve lançar ResourceNotFoundException ao baixar estoque de peça inexistente")
     void deveLancarResourceNotFoundExceptionAoBaixarEstoqueDePecaInexistente() {
-        when(repositoryPort.buscarPorId(1L)).thenReturn(Optional.empty());
+        when(repositoryPort.buscarPorIdParaAtualizacao(1L)).thenReturn(Optional.empty());
 
         assertThrows(ResourceNotFoundException.class, () -> pecaService.baixarEstoque(1L, 5));
         verify(repositoryPort, never()).salvar(any(Peca.class));
@@ -158,7 +158,7 @@ class PecaServiceTest {
     @DisplayName("Deve repor estoque com sucesso")
     void deveReporEstoque() {
         Peca peca = novaPeca(1L, "FIL001", 50, 10);
-        when(repositoryPort.buscarPorId(1L)).thenReturn(Optional.of(peca));
+        when(repositoryPort.buscarPorIdParaAtualizacao(1L)).thenReturn(Optional.of(peca));
 
         pecaService.reporEstoque(1L, 10);
 
@@ -169,7 +169,7 @@ class PecaServiceTest {
     @Test
     @DisplayName("Deve lançar ResourceNotFoundException ao repor estoque de peça inexistente")
     void deveLancarResourceNotFoundExceptionAoReporEstoqueDePecaInexistente() {
-        when(repositoryPort.buscarPorId(1L)).thenReturn(Optional.empty());
+        when(repositoryPort.buscarPorIdParaAtualizacao(1L)).thenReturn(Optional.empty());
 
         assertThrows(ResourceNotFoundException.class, () -> pecaService.reporEstoque(1L, 10));
         verify(repositoryPort, never()).salvar(any(Peca.class));
@@ -192,7 +192,7 @@ class PecaServiceTest {
         Peca pecaExistente = novaPeca(1L, "FIL001", 50, 10);
         Peca dadosAtualizados = new Peca(1L, "Filtro de Óleo Premium", "Nova descrição", "FIL001", new Preco(BigDecimal.valueOf(55.00)), null, 15);
 
-        when(repositoryPort.buscarPorId(1L)).thenReturn(Optional.of(pecaExistente));
+        when(repositoryPort.buscarPorIdParaAtualizacao(1L)).thenReturn(Optional.of(pecaExistente));
         when(repositoryPort.buscarPorCodigo("FIL001")).thenReturn(Optional.of(pecaExistente));
         when(repositoryPort.salvar(any(Peca.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
@@ -208,7 +208,7 @@ class PecaServiceTest {
     @DisplayName("Deve lançar ResourceNotFoundException ao atualizar peça inexistente")
     void deveLancarResourceNotFoundExceptionAoAtualizarPecaInexistente() {
         Peca dadosAtualizados = novaPeca(1L, "FIL001", 0, 10);
-        when(repositoryPort.buscarPorId(1L)).thenReturn(Optional.empty());
+        when(repositoryPort.buscarPorIdParaAtualizacao(1L)).thenReturn(Optional.empty());
 
         assertThrows(ResourceNotFoundException.class, () -> pecaService.atualizarPeca(dadosAtualizados));
         verify(repositoryPort, never()).salvar(any(Peca.class));
@@ -221,7 +221,7 @@ class PecaServiceTest {
         Peca outraPeca = novaPeca(2L, "FIL002", 20, 5);
         Peca dadosAtualizados = new Peca(1L, "Filtro de Óleo", "Descrição", "FIL002", new Preco(BigDecimal.valueOf(45.90)), null, 10);
 
-        when(repositoryPort.buscarPorId(1L)).thenReturn(Optional.of(pecaExistente));
+        when(repositoryPort.buscarPorIdParaAtualizacao(1L)).thenReturn(Optional.of(pecaExistente));
         when(repositoryPort.buscarPorCodigo("FIL002")).thenReturn(Optional.of(outraPeca));
 
         assertThrows(ResourceAlreadyExistsException.class, () -> pecaService.atualizarPeca(dadosAtualizados));
