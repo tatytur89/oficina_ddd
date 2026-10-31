@@ -43,11 +43,19 @@ O workflow [CI Pipeline](.github/workflows/ci-pipeline.yml) contém build Java, 
 
 Os gatilhos automáticos atendem pushes e pull requests para `main` e `dev`; a execução manual permite selecionar outra referência. A branch `isac` não dispara testes automaticamente a cada push. A pipeline mantém SMTP desabilitado para não enviar e-mails durante a automação. O workflow [Deploy AWS manual](.github/workflows/cd-pipeline.yml) é uma alternativa opt-in, dependente de infraestrutura e `KUBE_CONFIG` próprios; não é disparado pela entrega local.
 
-As alterações finais de CI/CD e documentação foram implementadas sem executar testes ou disparar a pipeline, conforme solicitado. A configuração deve ser executada no GitHub Actions para gerar a evidência da entrega automática; esta documentação não apresenta uma execução ainda não realizada como aprovada.
+A [execução de validação da versão final](https://github.com/tatytur89/oficina_ddd/actions/runs/41149491761), referente ao commit `e76dac1b4ab7b7594401ea60b4184b49724629e4` da branch `isac`, foi concluída com sucesso:
+
+- Verificação Java: 475 testes contabilizados, sendo 472 aprovados e 3 ignorados, sem falhas ou erros; verificação de cobertura aprovada.
+- Construção da imagem Docker, provisionamento do cluster Kubernetes e do PostgreSQL, execução das migrações e deploy da API aprovados.
+- Verificação de saúde e identificação do commit pela API via Ingress aprovadas; limpeza do ambiente temporário concluída.
+
+Para repetir a entrega, abra [GitHub Actions](https://github.com/tatytur89/oficina_ddd/actions/workflows/ci-pipeline.yml), selecione **Run workflow** e escolha a branch `isac`. O cluster criado pelo runner é temporário e removido ao final; a execução não mantém uma aplicação pública hospedada. Para reproduzir o ambiente na máquina, siga as instruções de Kubernetes local acima.
 
 ## Entrega acadêmica
 
-O vídeo de até 15 minutos deve mostrar deploy, execução do CI/CD, consumo das APIs e escala automática. Seu link público ou não listado no YouTube/Vimeo deve ser incluído aqui antes da entrega. O PDF do portal deve conter repositório, desenho e vídeo. O compartilhamento com `soat-architecture` deve ser confirmado pelo responsável no GitHub.
+A gravação do vídeo será realizada por uma integrante da equipe. Conforme o edital, o vídeo deve ter até 15 minutos e mostrar deploy, execução do CI/CD, consumo das APIs e escala automática. O link público ou não listado no YouTube/Vimeo será incluído nesta seção quando estiver disponível.
+
+O PDF para envio no portal deve reunir o [repositório na branch de entrega](https://github.com/tatytur89/oficina_ddd/tree/isac), o [desenho da arquitetura](docs/arquitetura-local.svg) e o link do vídeo. O responsável pelo repositório deve confirmar o compartilhamento com `soat-architecture` antes do envio.
 
 ## Arquitetura
 
