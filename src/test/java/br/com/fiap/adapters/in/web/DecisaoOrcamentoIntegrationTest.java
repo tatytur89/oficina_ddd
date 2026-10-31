@@ -35,8 +35,11 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 @SpringBootTest(properties = {
         "app.notifications.email.enabled=false",
-        "spring.datasource.url=jdbc:h2:mem:decisao-integracao;DB_CLOSE_DELAY=-1;MODE=PostgreSQL",
-        "spring.jpa.hibernate.ddl-auto=create-drop",
+        "spring.datasource.url=${OFICINA_TEST_DATABASE_URL:jdbc:h2:mem:decisao-integracao;DB_CLOSE_DELAY=-1;MODE=PostgreSQL}",
+        "spring.datasource.driver-class-name=${OFICINA_TEST_DATABASE_DRIVER:org.h2.Driver}",
+        "spring.datasource.username=${OFICINA_TEST_DATABASE_USER:sa}",
+        "spring.datasource.password=${OFICINA_TEST_DATABASE_PASSWORD:}",
+        "spring.jpa.hibernate.ddl-auto=${OFICINA_TEST_DATABASE_DDL:create-drop}",
         "api.security.token.secret=segredo-exclusivo-dos-testes-de-integracao",
         "app.admin.default-user=admin-integracao",
         "app.admin.default-password=senha-integracao"
