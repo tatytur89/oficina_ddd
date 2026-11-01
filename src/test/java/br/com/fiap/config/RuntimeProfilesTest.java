@@ -35,7 +35,7 @@ class RuntimeProfilesTest {
 
     @Test
     void deveUsarLocalComoPerfilPadraoSemCarregarConfiguracaoH2DosTestes() {
-        runner(null).run(context -> {
+        runner(null, localSettings()).run(context -> {
             assertThat(context).hasNotFailed();
             assertThat(context.getEnvironment().getDefaultProfiles()).contains("local");
             assertLocal(context.getBean(RuntimeSettings.class), "localhost");
@@ -45,7 +45,7 @@ class RuntimeProfilesTest {
     @ParameterizedTest
     @ValueSource(strings = {"local", "docker"})
     void deveResolverExecucaoNativaECompose(String profile) {
-        runner(profile).run(context -> {
+        runner(profile, localSettings()).run(context -> {
             assertThat(context).hasNotFailed();
             assertLocal(context.getBean(RuntimeSettings.class), profile.equals("docker") ? "postgres" : "localhost");
             if (profile.equals("docker")) {
@@ -56,7 +56,8 @@ class RuntimeProfilesTest {
 
     @Test
     void composeDevePermitirSobrescreverUrlSemPerderDefaultsLocais() {
-        runner("docker", "SPRING_DATASOURCE_URL=jdbc:postgresql://custom-postgres:5432/custom")
+        runner("docker", localSettings())
+                .withPropertyValues("SPRING_DATASOURCE_URL=jdbc:postgresql://custom-postgres:5432/custom")
                 .run(context -> {
                     assertThat(context).hasNotFailed();
                     assertThat(context.getBean(RuntimeSettings.class).url())
@@ -95,8 +96,18 @@ class RuntimeProfilesTest {
     }
 
     private static Stream<Arguments> missingExternalSettings() {
-        return Stream.of("lab", "aws")
-                .flatMap(profile -> EXTERNAL_SETTINGS.keySet().stream().map(key -> Arguments.of(profile, key)));
+        return Stream.of("local", "lab", "aws")
+                .flatMap(profile -> EXTERNAL_SETTINGS.keySet().stream()
+                        .filter(key -> !profile.equals("local")
+                                || (!key.equals("SPRING_DATASOURCE_URL") && !key.equals("JWT_SECRET")))
+                        .map(key -> Arguments.of(profile, key)));
+    }
+
+    private static String[] localSettings() {
+        return EXTERNAL_SETTINGS.entrySet().stream()
+                .filter(entry -> !entry.getKey().equals("SPRING_DATASOURCE_URL"))
+                .map(entry -> entry.getKey() + "=" + entry.getValue())
+                .toArray(String[]::new);
     }
 
     private ApplicationContextRunner runner(String profile, String... properties) {
@@ -126,11 +137,11 @@ class RuntimeProfilesTest {
 
     private void assertLocal(RuntimeSettings settings, String host) {
         assertThat(settings.url()).isEqualTo("jdbc:postgresql://" + host + ":5432/oficina_db");
-        assertThat(settings.username()).isEqualTo("oficina_user");
-        assertThat(settings.password()).isEqualTo("password123");
-        assertThat(settings.admin()).isEqualTo("admin");
-        assertThat(settings.adminPassword()).isEqualTo("admin123");
-        assertThat(settings.jwt()).isEqualTo("local-development-jwt-secret-at-least-32-bytes");
+        assertThat(settings.username()).isEqualTo(EXTERNAL_SETTINGS.get("SPRING_DATASOURCE_USERNAME"));
+        assertThat(settings.password()).isEqualTo(EXTERNAL_SETTINGS.get("SPRING_DATASOURCE_PASSWORD"));
+        assertThat(settings.admin()).isEqualTo(EXTERNAL_SETTINGS.get("ADMIN_USER"));
+        assertThat(settings.adminPassword()).isEqualTo(EXTERNAL_SETTINGS.get("ADMIN_PASSWORD"));
+        assertThat(settings.jwt()).isEqualTo(EXTERNAL_SETTINGS.get("JWT_SECRET"));
         assertThat(settings.ddl()).isEqualTo("update");
         assertThat(settings.showSql()).isTrue();
     }

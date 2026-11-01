@@ -293,6 +293,10 @@
           "request": {"method": "GET", "url": {"raw": "http://localhost:8089/api/v1/ordens-servico/1", "host": ["http://localhost:8089"], "path": ["api", "v1", "ordens-servico", "1"]}}
         },
         {
+          "name": "Excluir OS logicamente",
+          "request": {"method": "DELETE", "description": "Permitido somente para OS em RECEBIDA ou ENTREGUE. A OS permanece no banco e nas consultas, com excluidaEm preenchido nas respostas.", "url": {"raw": "http://localhost:8089/api/v1/ordens-servico/1", "host": ["http://localhost:8089"], "path": ["api", "v1", "ordens-servico", "1"]}}
+        },
+        {
           "name": "Listar OS por cliente",
           "request": {"method": "GET", "url": {"raw": "http://localhost:8089/api/v1/ordens-servico/cliente/1", "host": ["http://localhost:8089"], "path": ["api", "v1", "ordens-servico", "cliente", "1"]}}
         },

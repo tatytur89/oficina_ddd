@@ -26,6 +26,8 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
@@ -145,6 +147,46 @@ class OrdemServicoControllerTest {
 
         mockMvc.perform(get("/api/v1/ordens-servico/1"))
                 .andExpect(status().isOk());
+    }
+
+    @Test
+    void deveExporDataDeExclusaoNaConsultaDaOS() throws Exception {
+        LocalDateTime excluidaEm = LocalDateTime.of(2026, 10, 31, 12, 30);
+        OrdemServico osExcluida = new OrdemServico(1L, 1L, 1L, StatusOS.RECEBIDA, LocalDateTime.now(),
+                null, null, "obs", new Preco(BigDecimal.ZERO), new Preco(BigDecimal.ZERO),
+                new Preco(BigDecimal.ZERO), null, null, null, null, null, 0L, null, excluidaEm);
+        when(osUseCase.buscarPorId(1L)).thenReturn(osExcluida);
+
+        mockMvc.perform(get("/api/v1/ordens-servico/1"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.dados.excluidaEm").value("2026-10-31T12:30:00"));
+    }
+
+    @Test
+    void deveExcluirLogicamenteOSComSucesso() throws Exception {
+        mockMvc.perform(delete("/api/v1/ordens-servico/1"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.message").value("OS excluída logicamente com sucesso"));
+
+        verify(osUseCase).excluirLogicamente(1L);
+    }
+
+    @Test
+    void deveRetornar400AoExcluirLogicamenteOSForaDosStatusPermitidos() throws Exception {
+        doThrow(new IllegalStateException("A OS só pode ser excluída nos status RECEBIDA ou ENTREGUE."))
+                .when(osUseCase).excluirLogicamente(1L);
+
+        mockMvc.perform(delete("/api/v1/ordens-servico/1"))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void deveRetornar404AoExcluirLogicamenteOSInexistente() throws Exception {
+        doThrow(new ResourceNotFoundException("OS não encontrada com ID: 1"))
+                .when(osUseCase).excluirLogicamente(1L);
+
+        mockMvc.perform(delete("/api/v1/ordens-servico/1"))
+                .andExpect(status().isNotFound());
     }
 
     @Test

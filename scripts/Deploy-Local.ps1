@@ -40,8 +40,13 @@ if (!$hostLocked) {
 }
 $tempParent = [IO.Path]::GetFullPath([IO.Path]::GetTempPath())
 $tempRoot = Join-Path $tempParent ('oficina-deploy-' + [Guid]::NewGuid().ToString('N'))
+$previousVaultToken = [Environment]::GetEnvironmentVariable('VAULT_TOKEN', 'Process')
 try {
-    $requiredKeys = @('SPRING_DATASOURCE_URL', 'SPRING_DATASOURCE_USERNAME', 'SPRING_DATASOURCE_PASSWORD', 'JWT_SECRET', 'ADMIN_USER', 'ADMIN_PASSWORD')
+    New-Item -ItemType Directory -Path $tempRoot -Force | Out-Null
+    $testCredentials = $Namespace -match '^oficina-db-test-'
+    $requiredKeys = if ($testCredentials) {
+        @('SPRING_DATASOURCE_URL', 'SPRING_DATASOURCE_USERNAME', 'SPRING_DATASOURCE_PASSWORD', 'JWT_SECRET', 'ADMIN_USER', 'ADMIN_PASSWORD')
+    } else { @('JWT_SECRET') }
     $values = @{}
     foreach ($line in [IO.File]::ReadAllLines($SecretFile)) {
         if ([string]::IsNullOrWhiteSpace($line) -or $line.TrimStart().StartsWith('#')) { continue }
@@ -53,9 +58,26 @@ try {
         $values[$key] = $value
     }
     foreach ($key in $requiredKeys) { if (!$values.ContainsKey($key)) { throw "Missing local secret.env key: $key" } }
-    if ($values.SPRING_DATASOURCE_URL -cne 'jdbc:postgresql://postgres:5432/oficina_db' -or
-        $values.SPRING_DATASOURCE_USERNAME -cne 'oficina_user') { throw 'The local deployment requires the PostgreSQL Service and user provisioned by this project.' }
-    if ($values.JWT_SECRET.Length -lt 32 -or $values.ADMIN_PASSWORD.Length -lt 12) { throw 'Use at least 32 characters for JWT_SECRET and 12 for ADMIN_PASSWORD.' }
+    if ($values.JWT_SECRET.Length -lt 32) { throw 'Use at least 32 characters for JWT_SECRET.' }
+    if ($testCredentials -and ($values.SPRING_DATASOURCE_URL -cne 'jdbc:postgresql://postgres:5432/oficina_db' -or
+            $values.SPRING_DATASOURCE_USERNAME -cne 'oficina_user' -or $values.ADMIN_PASSWORD.Length -lt 12)) {
+        throw 'Test credentials do not match the disposable local database contract.'
+    }
+
+    $applicationSecretFile = Join-Path $tempRoot 'application-secret.env'
+    $syncArguments = @(
+        '-NoProfile', '-ExecutionPolicy', 'RemoteSigned', '-File',
+        (Join-Path $repoRoot 'infra/local/vault/scripts/Sync-LocalVaultSecrets.ps1'),
+        '-Namespace', $Namespace,
+        '-ApplicationSecretFile', $applicationSecretFile
+    )
+    if ($testCredentials) {
+        $syncArguments += @('-CredentialFile', $SecretFile)
+    } else {
+        $syncArguments += @('-JwtFile', $SecretFile)
+    }
+    Invoke-Tool 'powershell.exe' $syncArguments | Write-Host
+    [Environment]::SetEnvironmentVariable('VAULT_TOKEN', $null, 'Process')
 
     Invoke-Tool 'kubectl' ($namespaceArgs + @('rollout', 'status', 'statefulset/postgres', '--timeout=180s')) | Write-Host
     $jobs = Invoke-Tool 'kubectl' ($namespaceArgs + @('get', 'jobs', '-o', 'json')) | ConvertFrom-Json
@@ -81,9 +103,6 @@ try {
             }
         }
     }
-    $databaseSecret = Invoke-Tool 'kubectl' ($namespaceArgs + @('get', 'secret', 'postgres-secret', '-o', 'json')) | ConvertFrom-Json
-    $databasePassword = [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String($databaseSecret.data.POSTGRES_PASSWORD))
-    if ($values.SPRING_DATASOURCE_PASSWORD -cne $databasePassword) { throw 'Application and PostgreSQL Secret passwords differ.' }
     if ($Namespace -eq 'oficina-local' -and (Test-Path -LiteralPath (Join-Path $repoRoot 'k8s/local/mail.env'))) {
         & (Join-Path $PSScriptRoot 'Configure-LocalMail.ps1') -Namespace $Namespace
     }
@@ -131,7 +150,7 @@ try {
     foreach ($file in Get-ChildItem -LiteralPath (Join-Path $repoRoot 'k8s/local') -Filter '*.yaml' -File) {
         Copy-Item -LiteralPath $file.FullName -Destination $overlay
     }
-    Copy-Item -LiteralPath $SecretFile -Destination (Join-Path $overlay 'secret.env')
+    Copy-Item -LiteralPath $applicationSecretFile -Destination (Join-Path $overlay 'secret.env')
     $kustomizationPath = Join-Path $overlay 'kustomization.yaml'
     $kustomization = [IO.File]::ReadAllText($kustomizationPath)
     $kustomization = $kustomization -replace '(?m)^namespace:.*$', "namespace: $Namespace"
@@ -170,6 +189,7 @@ try {
     Write-Host "Ingress host: $IngressHost (use the cluster HTTP port with this Host header). HPA: $($autoscaler.spec.minReplicas)..$($autoscaler.spec.maxReplicas)."
     Write-Host "Access: kubectl --kubeconfig infra/local/.generated/kubeconfig --context kind-oficina-local -n $Namespace port-forward --address=127.0.0.1 service/oficina-api 8089:80"
 } finally {
+    [Environment]::SetEnvironmentVariable('VAULT_TOKEN', $previousVaultToken, 'Process')
     if (Test-Path -LiteralPath $tempRoot) {
         $resolved = [IO.Path]::GetFullPath($tempRoot)
         if (!$resolved.StartsWith($tempParent, [StringComparison]::OrdinalIgnoreCase) -or

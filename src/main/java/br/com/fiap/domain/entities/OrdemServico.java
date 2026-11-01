@@ -28,6 +28,7 @@ public class OrdemServico {
     private String comentarioAvaliacao;
     private long versaoOrcamento;
     private Boolean decisaoOrcamento;
+    private LocalDateTime excluidaEm;
 
     public OrdemServico(Long id, Long clienteId, Long veiculoId, StatusOS status,
                         LocalDateTime dataAbertura, LocalDateTime dataPrevistaEntrega,
@@ -37,7 +38,7 @@ public class OrdemServico {
                         Integer notaAvaliacao, String comentarioAvaliacao) {
         this(id, clienteId, veiculoId, status, dataAbertura, dataPrevistaEntrega, dataConclusao,
                 observacoes, valorServicos, valorPecas, valorTotal, servicos, pecas, chaveAcesso,
-                notaAvaliacao, comentarioAvaliacao, 0, null);
+                notaAvaliacao, comentarioAvaliacao, 0, null, null);
     }
 
     public OrdemServico(Long id, Long clienteId, Long veiculoId, StatusOS status,
@@ -47,6 +48,18 @@ public class OrdemServico {
                         List<ServicoOS> servicos, List<PecaOS> pecas, String chaveAcesso,
                         Integer notaAvaliacao, String comentarioAvaliacao,
                         long versaoOrcamento, Boolean decisaoOrcamento) {
+        this(id, clienteId, veiculoId, status, dataAbertura, dataPrevistaEntrega, dataConclusao,
+                observacoes, valorServicos, valorPecas, valorTotal, servicos, pecas, chaveAcesso,
+                notaAvaliacao, comentarioAvaliacao, versaoOrcamento, decisaoOrcamento, null);
+    }
+
+    public OrdemServico(Long id, Long clienteId, Long veiculoId, StatusOS status,
+                        LocalDateTime dataAbertura, LocalDateTime dataPrevistaEntrega,
+                        LocalDateTime dataConclusao, String observacoes,
+                        Preco valorServicos, Preco valorPecas, Preco valorTotal,
+                        List<ServicoOS> servicos, List<PecaOS> pecas, String chaveAcesso,
+                        Integer notaAvaliacao, String comentarioAvaliacao,
+                        long versaoOrcamento, Boolean decisaoOrcamento, LocalDateTime excluidaEm) {
         this.id = id;
         this.clienteId = clienteId;
         this.veiculoId = veiculoId;
@@ -65,6 +78,7 @@ public class OrdemServico {
         this.comentarioAvaliacao = comentarioAvaliacao;
         this.versaoOrcamento = versaoOrcamento;
         this.decisaoOrcamento = decisaoOrcamento;
+        this.excluidaEm = excluidaEm;
     }
 
     public static OrdemServico abrir(Long clienteId, Long veiculoId, String observacoes) {
@@ -95,6 +109,15 @@ public class OrdemServico {
 
     public void definirDataPrevistaEntrega(LocalDateTime dataPrevistaEntrega) {
         this.dataPrevistaEntrega = dataPrevistaEntrega;
+    }
+
+    public void marcarComoExcluida() {
+        if (status != StatusOS.RECEBIDA && status != StatusOS.ENTREGUE) {
+            throw new IllegalStateException("A OS só pode ser excluída nos status RECEBIDA ou ENTREGUE.");
+        }
+        if (excluidaEm == null) {
+            excluidaEm = LocalDateTime.now();
+        }
     }
 
     public void adicionarServico(Servico servico, int quantidade) {
@@ -249,4 +272,5 @@ public class OrdemServico {
     public String getComentarioAvaliacao() { return comentarioAvaliacao; }
     public long getVersaoOrcamento() { return versaoOrcamento; }
     public Boolean getDecisaoOrcamento() { return decisaoOrcamento; }
+    public LocalDateTime getExcluidaEm() { return excluidaEm; }
 }

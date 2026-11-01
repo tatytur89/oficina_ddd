@@ -161,7 +161,18 @@ try {
     $rootManifests = @(Get-ChildItem -LiteralPath (Join-Path $repoRoot 'k8s') -File | Where-Object { $_.Extension -in @('.yaml', '.yml') })
     Assert-Check ($rootManifests.Count -eq 0) 'Kubernetes root has no ambiguous default apply target'
 
-    $compose = Invoke-Success 'docker' @('compose', '-f', (Join-Path $repoRoot 'docker-compose.yaml'), 'config', '--format', 'json') | ConvertFrom-Json
+    $credentialEnvironment = @{}
+    foreach ($key in @('SPRING_DATASOURCE_USERNAME', 'SPRING_DATASOURCE_PASSWORD', 'ADMIN_USER', 'ADMIN_PASSWORD')) {
+        $credentialEnvironment[$key] = [Environment]::GetEnvironmentVariable($key, 'Process')
+        [Environment]::SetEnvironmentVariable($key, 'integration-test-only-value', 'Process')
+    }
+    try {
+        $compose = Invoke-Success 'docker' @('compose', '-f', (Join-Path $repoRoot 'docker-compose.yaml'), 'config', '--format', 'json') | ConvertFrom-Json
+    } finally {
+        foreach ($key in $credentialEnvironment.Keys) {
+            [Environment]::SetEnvironmentVariable($key, $credentialEnvironment[$key], 'Process')
+        }
+    }
     $composeProfile = $compose.services.'oficina-ddd'.environment.SPRING_PROFILES_ACTIVE
     Assert-Check ($composeProfile -eq 'docker') 'Compose selects its isolated development Spring profile'
     $workflow = Get-Content -LiteralPath (Join-Path $repoRoot '.github/workflows/cd-pipeline.yml') -Raw
@@ -170,11 +181,12 @@ try {
 
     foreach ($path in @('k8s/local/secret.env', 'k8s/aws/secret.yaml', 'infra/local/terraform.tfstate', 'infra/local/terraform.tfvars', 'infra/local/.terraform/providers/placeholder',
             'infra/local/database/terraform.tfstate', 'infra/local/database/terraform.tfvars', 'infra/local/database/.terraform/providers/placeholder', 'infra/local/database/database.tfplan',
+            'infra/local/vault/terraform.tfstate', 'infra/local/vault/.terraform/providers/placeholder',
             'infra/local/addons/.terraform/providers/placeholder', 'infra/local/addons/terraform.tfvars', 'infra/local/addons/terraform.tfstate', 'infra/local/addons/addons.tfplan')) {
         $ignored = Invoke-Native 'git' @('check-ignore', '--no-index', $path)
         Assert-Check ($ignored.Code -eq 0) "Sensitive or generated path is ignored: $path"
     }
-    foreach ($path in @('k8s/local/secret.env.example', 'k8s/local/mail.env', 'k8s/local/mail.env.example', 'k8s/aws/secret.yaml.example', 'infra/local/database/terraform.tfvars.example')) {
+    foreach ($path in @('k8s/local/secret.env.example', 'k8s/local/mail.env', 'k8s/local/mail.env.example', 'k8s/aws/secret.yaml.example')) {
         $ignored = Invoke-Native 'git' @('check-ignore', '--no-index', $path)
         Assert-Check ($ignored.Code -eq 1) "Reviewable example remains versionable: $path"
     }

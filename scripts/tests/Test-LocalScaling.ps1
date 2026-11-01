@@ -148,12 +148,15 @@ try{
     $password='db-smoke-'+[Guid]::NewGuid().ToString('N')
     $admin='admin-scaling'
     $adminPassword='admin-smoke-'+[Guid]::NewGuid().ToString('N')
-    $variables=[pscustomobject]@{namespace=$namespace;database_password=$password;kubeconfig_path=$kubeconfig;context='kind-oficina-local'}
+    $variables=[pscustomobject]@{namespace=$namespace;external_secrets=$true;kubeconfig_path=$kubeconfig;context='kind-oficina-local'}
     [IO.File]::WriteAllText((Join-Path $moduleRoot 'smoke.auto.tfvars.json'),($variables|ConvertTo-Json))
     $secretFile=Join-Path $testRoot 'application-secret.env'
     [IO.File]::WriteAllText($secretFile,(@('SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/oficina_db',
         'SPRING_DATASOURCE_USERNAME=oficina_user',"SPRING_DATASOURCE_PASSWORD=$password",
         ('JWT_SECRET=scaling-smoke-'+[Guid]::NewGuid().ToString('N')),"ADMIN_USER=$admin","ADMIN_PASSWORD=$adminPassword")-join "`n"))
+    Assert-TestTool 'powershell.exe' @('-NoProfile','-ExecutionPolicy','RemoteSigned','-File',
+        (Join-Path $repoRoot 'infra/local/vault/scripts/Sync-LocalVaultSecrets.ps1'),
+        '-Namespace',$namespace,'-CredentialFile',$secretFile,'-DatabaseOnly','-Kubeconfig',$kubeconfig,'-Context','kind-oficina-local')|Out-Null
     Invoke-DatabaseTerraform @('init','-input=false','-no-color')|Out-Null
     Invoke-DatabaseTerraform @('validate','-no-color')|Out-Null
     Invoke-DatabaseTerraform @('plan','-input=false','-no-color','-out=smoke.tfplan')|Out-Null

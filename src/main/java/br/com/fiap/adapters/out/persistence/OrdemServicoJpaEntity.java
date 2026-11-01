@@ -64,6 +64,9 @@ public class OrdemServicoJpaEntity {
     @Column(name = "decisao_orcamento")
     private Boolean decisaoOrcamento;
 
+    @Column(name = "excluida_em")
+    private LocalDateTime excluidaEm;
+
     @OneToMany(cascade = CascadeType.ALL, orphanRemoval = true)
     @JoinColumn(name = "ordem_servico_id")
     private List<ServicoOSJpaEntity> servicos = new ArrayList<>();
@@ -111,12 +114,14 @@ public class OrdemServicoJpaEntity {
     public String getComentarioAvaliacao() { return comentarioAvaliacao; }
     public Long getVersaoOrcamento() { return versaoOrcamento; }
     public Boolean getDecisaoOrcamento() { return decisaoOrcamento; }
+    public LocalDateTime getExcluidaEm() { return excluidaEm; }
     public List<ServicoOSJpaEntity> getServicos() { return servicos; }
     public List<PecaOSJpaEntity> getPecas() { return pecas; }
 
     public void setStatus(String status) { this.status = status; }
     public void setVersaoOrcamento(Long versaoOrcamento) { this.versaoOrcamento = versaoOrcamento; }
     public void setDecisaoOrcamento(Boolean decisaoOrcamento) { this.decisaoOrcamento = decisaoOrcamento; }
+    public void setExcluidaEm(LocalDateTime excluidaEm) { this.excluidaEm = excluidaEm; }
     public void setDataConclusao(LocalDateTime dataConclusao) { this.dataConclusao = dataConclusao; }
     public void setValorServicos(BigDecimal valorServicos) { this.valorServicos = valorServicos; }
     public void setValorPecas(BigDecimal valorPecas) { this.valorPecas = valorPecas; }

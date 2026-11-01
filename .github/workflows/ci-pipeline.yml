@@ -43,7 +43,7 @@ jobs:
         run: |
           chmod +x ./mvnw
           if [ -n "$NVD_API_KEY" ]; then
-            ./mvnw -B verify
+            ./mvnw -B verify -Ddependency-check.skip=false -DnvdApiKey="$NVD_API_KEY"
           else
             echo "::notice::NVD_API_KEY is not configured; skipping OWASP Dependency-Check."
             ./mvnw -B verify -Ddependency-check.skip=true

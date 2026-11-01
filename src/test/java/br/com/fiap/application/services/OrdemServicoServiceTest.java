@@ -298,6 +298,48 @@ class OrdemServicoServiceTest {
     }
 
     @Test
+    @DisplayName("Deve excluir logicamente OS recebida ou entregue")
+    void deveExcluirLogicamenteOSRecebidaOuEntregue() {
+        OrdemServico recebida = osComStatus(StatusOS.RECEBIDA);
+        OrdemServico entregue = osComStatus(StatusOS.ENTREGUE);
+        when(osRepositoryPort.buscarPorIdParaAtualizacao(1L)).thenReturn(Optional.of(recebida));
+        when(osRepositoryPort.buscarPorIdParaAtualizacao(2L)).thenReturn(Optional.of(entregue));
+        when(osRepositoryPort.salvar(any(OrdemServico.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        ordemServicoService.excluirLogicamente(1L);
+        LocalDateTime primeiraExclusao = recebida.getExcluidaEm();
+        ordemServicoService.excluirLogicamente(1L);
+        ordemServicoService.excluirLogicamente(2L);
+
+        assertNotNull(recebida.getExcluidaEm());
+        assertEquals(primeiraExclusao, recebida.getExcluidaEm());
+        assertNotNull(entregue.getExcluidaEm());
+        verify(osRepositoryPort, times(3)).salvar(any(OrdemServico.class));
+    }
+
+    @Test
+    @DisplayName("Deve rejeitar exclusão lógica fora de RECEBIDA e ENTREGUE")
+    void deveRejeitarExclusaoLogicaForaDosStatusPermitidos() {
+        for (StatusOS status : List.of(StatusOS.EM_DIAGNOSTICO, StatusOS.AGUARDANDO_APROVACAO,
+                StatusOS.EM_EXECUCAO, StatusOS.FINALIZADA)) {
+            when(osRepositoryPort.buscarPorIdParaAtualizacao(1L))
+                    .thenReturn(Optional.of(osComStatus(status)));
+
+            assertThrows(IllegalStateException.class, () -> ordemServicoService.excluirLogicamente(1L));
+        }
+        verify(osRepositoryPort, never()).salvar(any(OrdemServico.class));
+    }
+
+    @Test
+    @DisplayName("Deve retornar erro ao excluir logicamente uma OS inexistente")
+    void deveLancarResourceNotFoundAoExcluirOSInexistente() {
+        when(osRepositoryPort.buscarPorIdParaAtualizacao(1L)).thenReturn(Optional.empty());
+
+        assertThrows(ResourceNotFoundException.class, () -> ordemServicoService.excluirLogicamente(1L));
+        verify(osRepositoryPort, never()).salvar(any(OrdemServico.class));
+    }
+
+    @Test
     @DisplayName("Deve atualizar o status da OS com sucesso")
     void deveAtualizarStatus() {
         OrdemServico os = osComStatus(StatusOS.RECEBIDA);

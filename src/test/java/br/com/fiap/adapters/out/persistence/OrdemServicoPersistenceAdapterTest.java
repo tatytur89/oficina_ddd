@@ -136,6 +136,27 @@ class OrdemServicoPersistenceAdapterTest {
     }
 
     @Test
+    void devePersistirExclusaoLogicaSemOcultarOSDasConsultas() {
+        Long id = osPersistenceAdapter.salvar(
+                novaOS(1L, 1L, StatusOS.RECEBIDA, LocalDateTime.now())).getId();
+        entityManager.flush();
+        entityManager.clear();
+
+        OrdemServico os = osPersistenceAdapter.buscarPorIdParaAtualizacao(id).orElseThrow();
+        os.marcarComoExcluida();
+        osPersistenceAdapter.salvar(os);
+        entityManager.flush();
+        entityManager.clear();
+
+        OrdemServico recarregada = osPersistenceAdapter.buscarPorId(id).orElseThrow();
+
+        assertNotNull(recarregada.getExcluidaEm());
+        assertTrue(osPersistenceAdapter.buscarTodas().stream().anyMatch(resultado -> resultado.getId().equals(id)));
+        assertTrue(osPersistenceAdapter.buscarPorStatus(StatusOS.RECEBIDA).stream()
+                .anyMatch(resultado -> resultado.getId().equals(id) && resultado.getExcluidaEm() != null));
+    }
+
+    @Test
     @DisplayName("Deve buscar OS por cliente")
     void deveBuscarPorClienteId() {
         osPersistenceAdapter.salvar(novaOS(1L, 1L, StatusOS.RECEBIDA, LocalDateTime.now()));

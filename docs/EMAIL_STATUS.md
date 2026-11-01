@@ -70,7 +70,7 @@ powershell.exe -NoProfile -ExecutionPolicy RemoteSigned -File scripts/tests/Test
 
 Os testes Java usam SMTP em loopback com credenciais fictícias, cobrem LOGIN, commit/rollback, envio fora de transação, falha de envio e configuração habilitada/desabilitada. Não enviam mensagens externas. O teste de proteção simula erros contendo dados privados e verifica que as credenciais não aparecem no console.
 
-O teste real é **opt-in**, cria cliente, veículo e OS novos e envia um aviso na abertura:
+O teste real é **opt-in**, cria cliente, veículo e OS novos e envia um aviso na abertura. O script solicita o token Vault e lê o usuário/senha admin de `secret/data/oficina-local`:
 
 ```powershell
 powershell.exe -NoProfile -ExecutionPolicy RemoteSigned -File scripts/tests/Test-LocalMail.ps1 -Recipient isacjobz@gmail.com

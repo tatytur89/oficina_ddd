@@ -24,18 +24,19 @@ O fluxo de entrega é: **checkout → build/testes → imagem Docker → Terrafo
 
 ## Início rápido para avaliação
 
-```bash
+```powershell
 git clone --branch isac https://github.com/tatytur89/oficina_ddd.git
 cd oficina_ddd
-docker compose up --build
+# Depois de provisionar/desbloquear o Vault e carregar as credenciais:
+powershell.exe -NoProfile -ExecutionPolicy RemoteSigned -File scripts/Start-LocalCompose.ps1
 ```
 
 - Swagger: `http://localhost:8089/swagger-ui/index.html`.
-- Login Compose: `POST /api/v1/auth/login`, corpo `{"usuario":"admin","senha":"admin123"}`; use o token Bearer nas rotas administrativas.
+- Login Compose: `POST /api/v1/auth/login`, usando as credenciais admin do Vault; use o token Bearer nas rotas administrativas.
 - [Collection completa Postman](postman/Oficina-DDD.postman_collection.json).
 - A conta SMTP de avaliação é carregada de `k8s/local/mail.env`; cadastre no cliente o destinatário autorizado e abra/altere uma OS para receber o aviso. [Configuração e comportamento do e-mail HTML](docs/EMAIL_STATUS.md).
 
-Para Kubernetes local, siga nesta ordem: [cluster Terraform](infra/local/README.md), [PostgreSQL e migrações](infra/local/database/README.md), [Traefik e métricas](infra/local/addons/README.md) e [deploy da aplicação](k8s/local/README.md). O script de deploy carrega a configuração SMTP de avaliação automaticamente no namespace principal. O Docker Compose precisa de suporte a `env_file.required` (Compose 2.24 ou superior).
+Para Kubernetes local, siga nesta ordem: [cluster Terraform](infra/local/README.md), [Vault local](infra/local/vault/README.md), [PostgreSQL e migrações](infra/local/database/README.md), [Traefik e métricas](infra/local/addons/README.md) e [deploy da aplicação](k8s/local/README.md). O script de deploy carrega a configuração SMTP de avaliação automaticamente no namespace principal. O Docker Compose precisa de suporte a `env_file.required` (Compose 2.24 ou superior).
 
 ## CI/CD
 
@@ -145,17 +146,17 @@ Essa verificação prepara as ferramentas, mas não cria o cluster, não provisi
 
 O perfil `local` usa `spring.jpa.hibernate.ddl-auto=update`: ao subir, o Hibernate cria/atualiza as tabelas em um banco vazio. O perfil `docker` mantém esse comportamento para desenvolvimento com Compose. Os perfis `lab` e `aws` usam `validate` e exigem preparação prévia do schema. No laboratório, siga [PostgreSQL e migrações](infra/local/database/README.md); o Terraform executa o SQL versionado antes do deploy. Para AWS, veja [Deploy no Kubernetes](#deploy-no-kubernetes).
 
-Ao iniciar, a aplicação cria o usuário administrador padrão `admin` / `admin123` (configurável pelas variáveis `ADMIN_USER` e `ADMIN_PASSWORD`).
+Ao iniciar, a aplicação cria o administrador configurado em `ADMIN_USER` e `ADMIN_PASSWORD` somente se ainda não existir. No fluxo local, essas credenciais vêm do Vault; não há senha padrão.
 
 ### Opção 1: Docker Compose (aplicação + PostgreSQL)
 
 ```bash
-docker compose up --build
+powershell.exe -NoProfile -ExecutionPolicy RemoteSigned -File scripts/Start-LocalCompose.ps1
 ```
 
 - API: `http://localhost:8089`
 - Swagger: `http://localhost:8089/swagger-ui/index.html`
-- PostgreSQL: `localhost:5432` (banco `oficina_db`, usuário `oficina_user`, senha `password123`)
+- PostgreSQL: `localhost:5432` (banco `oficina_db`; credenciais carregadas do Vault em runtime)
 
 Para parar (adicione `-v` para apagar também os dados do banco):
 
@@ -179,7 +180,7 @@ A aplicação espera o PostgreSQL em `localhost:5432` com as credenciais acima (
 
 ### Porta 5432 ocupada
 
-Se já houver outro PostgreSQL usando a porta 5432, o Compose falha ao publicar o banco (ou a aplicação via Maven conecta no banco errado e retorna `password authentication failed for user "oficina_user"`). Pare o outro PostgreSQL ou altere a porta publicada em `docker-compose.yaml` para `"5433:5432"`; nesse caso, ao rodar via Maven, informe a nova porta:
+Se já houver outro PostgreSQL usando a porta 5432, o Compose falha ao publicar o banco (ou a aplicação conecta no banco errado). Pare o outro PostgreSQL ou altere a porta publicada em `docker-compose.yaml` para `"5433:5432"`. A execução via Maven exige que as credenciais do Vault estejam disponíveis nas variáveis `SPRING_DATASOURCE_USERNAME`, `SPRING_DATASOURCE_PASSWORD`, `ADMIN_USER` e `ADMIN_PASSWORD`.
 
 ```bash
 SPRING_DATASOURCE_URL=jdbc:postgresql://localhost:5433/oficina_db ./mvnw spring-boot:run
@@ -187,7 +188,7 @@ SPRING_DATASOURCE_URL=jdbc:postgresql://localhost:5433/oficina_db ./mvnw spring-
 
 ### Testar a API
 
-1. Autentique com `POST /api/v1/auth/login` usando `admin` / `admin123` (veja [Autenticação](#autenticação)).
+1. Autentique com `POST /api/v1/auth/login` usando o usuário e senha admin do Vault (veja [Autenticação](#autenticação)).
 2. Use o token no Swagger (`Authorize`) ou importe a coleção `postman/Oficina-DDD.postman_collection.json` no Postman ou no Bruno (`Import Collection → Postman Collection`). A coleção aponta para `http://localhost:8089` (Docker Compose); ao rodar via Maven, troque para a porta `8080`.
 
 ## Comandos Maven
@@ -225,7 +226,7 @@ Copy-Item k8s/local/secret.env.example k8s/local/secret.env
 kubectl kustomize k8s/local
 ```
 
-`secret.env` é ignorado pelo Git. A saída renderizada contém os valores do Secret codificados; não a publique. Esse comando não acessa o cluster e não realiza deploy. Prepare o banco com [sua raiz Terraform](infra/local/database/README.md) e mantenha as credenciais iguais às do Secret da aplicação. Instale [Traefik e metrics-server](infra/local/addons/README.md) e execute [o script de build e deploy](k8s/local/README.md). O Ingress atende HTTP em loopback e o HPA ajusta de 2 a 5 réplicas por CPU.
+`secret.env` é ignorado pelo Git e contém somente o JWT local. Usuário/senha do PostgreSQL e admin são armazenados no [Vault local provisionado por Terraform](infra/local/vault/README.md) e recuperados em tempo de execução; nunca são enviados ao build da imagem. Prepare o banco com [sua raiz Terraform](infra/local/database/README.md), instale [Traefik e metrics-server](infra/local/addons/README.md) e execute [o script de build e deploy](k8s/local/README.md). Para o Docker Compose, use `scripts/Start-LocalCompose.ps1`, que obtém os segredos do mesmo Vault. O Ingress atende HTTP em loopback e o HPA ajusta de 2 a 5 réplicas por CPU.
 
 ## Deploy no Kubernetes
 
@@ -336,8 +337,8 @@ Exemplo de corpo:
 
 ```json
 {
-  "usuario": "admin",
-  "senha": "admin123"
+  "usuario": "<ADMIN_USER>",
+  "senha": "<ADMIN_PASSWORD>"
 }
 ```
 
@@ -506,6 +507,7 @@ Base: `/api/v1/ordens-servico`
 | POST | `/api/v1/ordens-servico` | Criar OS |
 | GET | `/api/v1/ordens-servico` | Listar fila operacional de OS por prioridade e antiguidade |
 | GET | `/api/v1/ordens-servico/{id}` | Buscar OS por ID |
+| DELETE | `/api/v1/ordens-servico/{id}` | Excluir OS logicamente (status `RECEBIDA` ou `ENTREGUE`; consultas continuam incluindo-a) |
 | GET | `/api/v1/ordens-servico/cliente/{clienteId}` | Listar OS de um cliente |
 | GET | `/api/v1/ordens-servico/status/{status}` | Listar OS por status |
 | GET | `/api/v1/ordens-servico/periodo?inicio={data}&fim={data}` | Listar OS abertas num período |
@@ -516,6 +518,8 @@ Base: `/api/v1/ordens-servico`
 | POST | `/api/v1/ordens-servico/{id}/servicos` | Adicionar um serviço à OS (exige `EM_DIAGNOSTICO`) |
 | POST | `/api/v1/ordens-servico/{id}/pecas` | Adicionar uma peça à OS (exige `EM_DIAGNOSTICO`) |
 | GET | `/api/v1/ordens-servico/metricas/tempo-medio-execucao` | Tempo médio de execução das OS finalizadas |
+
+A exclusão lógica preserva os dados da OS e define `excluidaEm` nas respostas. A operação só é permitida nos status `RECEBIDA` e `ENTREGUE`; OS excluídas continuam aparecendo em todas as consultas.
 
 ### Fila operacional e histórico
 

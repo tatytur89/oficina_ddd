@@ -148,7 +148,12 @@ try {
     New-Item -ItemType Directory -Path (Join-Path $testRoot 'database') -Force | Out-Null
     Copy-Item -LiteralPath (Join-Path $repoRoot 'database/migrate.sh') -Destination (Join-Path $testRoot 'database')
     $password = 'smoke-' + [Guid]::NewGuid().ToString('N')
-    $variables = [pscustomobject]@{namespace=$namespace; database_password=$password; kubeconfig_path=$kubeconfig; context=$context}
+    $credentials = Join-Path $testRoot 'database-secret.env'
+    [IO.File]::WriteAllText($credentials, "SPRING_DATASOURCE_USERNAME=oficina_user`nSPRING_DATASOURCE_PASSWORD=$password`n")
+    Invoke-Success 'powershell.exe' @('-NoProfile','-ExecutionPolicy','RemoteSigned','-File',
+        (Join-Path $repoRoot 'infra/local/vault/scripts/Sync-LocalVaultSecrets.ps1'),
+        '-Namespace',$namespace,'-CredentialFile',$credentials,'-DatabaseOnly','-Kubeconfig',$kubeconfig,'-Context',$context) | Out-Null
+    $variables = [pscustomobject]@{namespace=$namespace; external_secrets=$true; kubeconfig_path=$kubeconfig; context=$context}
     [IO.File]::WriteAllText((Join-Path $moduleRoot 'smoke.auto.tfvars.json'), ($variables | ConvertTo-Json))
     Assert-TerraformSuccess @('fmt','-check','-recursive') | Out-Null
     Assert-TerraformSuccess @('init','-input=false','-no-color') | Out-Null
@@ -188,7 +193,7 @@ try {
     } finally { [IO.File]::WriteAllText($initial, $originalSql) }
     Assert-TerraformSuccess @('apply','-input=false','-no-color','-auto-approve') | Out-Null
 
-    $rollbackSql = Join-Path $migrationRoot 'V002__rollback_probe.sql'
+    $rollbackSql = Join-Path $migrationRoot 'V003__rollback_probe.sql'
     try {
         [IO.File]::WriteAllText($rollbackSql, 'CREATE TABLE public.oficina_rollback_probe (id INTEGER PRIMARY KEY); SELECT 1 / 0;')
         $broken = Invoke-Terraform @('apply','-input=false','-no-color','-auto-approve')
