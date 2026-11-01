@@ -125,12 +125,11 @@ class OrdemServicoTest {
     }
 
     @Test
-    void deveTransicionarDeAguardandoAprovacaoParaEmExecucao() {
+    void naoDeveContornarAprovacaoPelaTransicaoGenerica() {
         OrdemServico os = osComStatus(StatusOS.AGUARDANDO_APROVACAO);
 
-        os.transicionarPara(StatusOS.EM_EXECUCAO);
-
-        assertEquals(StatusOS.EM_EXECUCAO, os.getStatus());
+        assertThrows(IllegalStateException.class, () -> os.transicionarPara(StatusOS.EM_EXECUCAO));
+        assertEquals(StatusOS.AGUARDANDO_APROVACAO, os.getStatus());
     }
 
     @Test

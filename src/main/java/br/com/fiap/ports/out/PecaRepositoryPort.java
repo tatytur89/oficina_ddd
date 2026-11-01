@@ -9,6 +9,7 @@ public interface PecaRepositoryPort {
     Peca salvar(Peca peca);
     List<Peca> buscarTodas();
     Optional<Peca> buscarPorId(Long id);
+    Optional<Peca> buscarPorIdParaAtualizacao(Long id);
     Optional<Peca> buscarPorCodigo(String codigo);
     List<Peca> buscarEstoqueBaixo(int estoqueMinimo);
     void excluirPorId(Long id);

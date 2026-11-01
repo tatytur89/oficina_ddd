@@ -64,7 +64,7 @@ public class PecaService implements PecaUseCase {
     @Override
     @Transactional
     public void baixarEstoque(Long pecaId, int quantidade) {
-        Peca peca = pecaRepositoryPort.buscarPorId(pecaId)
+        Peca peca = pecaRepositoryPort.buscarPorIdParaAtualizacao(pecaId)
             .orElseThrow(() -> new ResourceNotFoundException("Peça não encontrada com ID: " + pecaId));
 
         peca.baixarEstoque(quantidade);
@@ -74,7 +74,7 @@ public class PecaService implements PecaUseCase {
     @Override
     @Transactional
     public void reporEstoque(Long pecaId, int quantidade) {
-        Peca peca = pecaRepositoryPort.buscarPorId(pecaId)
+        Peca peca = pecaRepositoryPort.buscarPorIdParaAtualizacao(pecaId)
             .orElseThrow(() -> new ResourceNotFoundException("Peça não encontrada com ID: " + pecaId));
 
         peca.reporEstoque(quantidade);
@@ -87,12 +87,13 @@ public class PecaService implements PecaUseCase {
     }
 
     @Override
+    @Transactional
     public Peca atualizarPeca(Peca peca) {
         if (peca == null || peca.getId() == null) {
             throw new IllegalArgumentException("A peça e o ID são obrigatórios");
         }
 
-        Peca pecaExistente = pecaRepositoryPort.buscarPorId(peca.getId())
+        Peca pecaExistente = pecaRepositoryPort.buscarPorIdParaAtualizacao(peca.getId())
                 .orElseThrow(() -> new ResourceNotFoundException("Peça não encontrada com ID: " + peca.getId()));
 
         Optional<Peca> pecaComMesmoCodigo = pecaRepositoryPort.buscarPorCodigo(peca.getCodigo());

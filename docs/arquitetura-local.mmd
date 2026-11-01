@@ -1,0 +1,64 @@
+flowchart TB
+    user[Cliente / equipe administrativa]
+    subgraph app[Aplicação — arquitetura hexagonal]
+        http[Adaptadores de entrada HTTP / REST]
+        usecases[Portas de entrada e casos de uso]
+        domain[Domínio: OS, orçamento e regras de transição]
+        ports[Portas de saída: repositórios e notificação]
+        persistence[Adaptadores JPA / PostgreSQL]
+        events[Publicação de evento de status]
+        smtp[Listener AFTER_COMMIT → adaptador SMTP]
+        http --> usecases --> domain
+        usecases --> ports
+        ports --> persistence
+        ports --> events --> smtp
+    end
+    user --> http
+    smtp --> gmail[Gmail SMTPS 465 / AUTH LOGIN]
+    gmail --> recipient[E-mail do cliente da OS]
+    smtp -. Falha não desfaz a transação .-> best[Melhor esforço: sem outbox / retry automático]
+
+    subgraph kind[Cluster kind local — 1 control-plane + 1 worker]
+        subgraph cp[Control-plane — ingress-ready]
+            traefik[Traefik / hostPort 80 e 443]
+        end
+        ingress[Ingress oficina.local → Service oficina-api:80]
+        api[Deployment API / perfil lab / Pods distribuídos pelo scheduler]
+        hpa[HPA: 2 a 5 réplicas / CPU alvo 70%]
+        metrics[Metrics Server → métricas reais de CPU]
+        dbservice[Service PostgreSQL:5432]
+        pg[StatefulSet PostgreSQL 18 / 1 réplica]
+        pvc[PVC 1 Gi / retenção Retain / armazenamento local]
+        migrate[Job de migração SQL versionada / checksum / transação]
+        mailsecret[Secret SMTP opcional / credencial fora do Git]
+        traefik --> ingress --> api
+        metrics --> hpa --> api
+        api --> dbservice --> pg --> pvc
+        migrate --> dbservice
+        mailsecret -. Configuração opt-in .-> api
+    end
+    loop[Loopback 127.0.0.1:8090 / Host oficina.local] --> traefik
+    api -. Executa .-> http
+    persistence --> dbservice
+
+    subgraph iac[Terraform — estados independentes]
+        tfcluster[infra/local: ciclo de vida kind + kubeconfig dedicado]
+        tfdb[infra/local/database: PostgreSQL + PVC + migração]
+        tfaddons[infra/local/addons: Helm Traefik + Metrics Server]
+    end
+    tfcluster --> kind
+    tfdb --> pg
+    tfdb --> migrate
+    tfaddons --> traefik
+    tfaddons --> metrics
+
+    subgraph ci[CI Linux — infra/ci / fluxo de entrega]
+        checkout[Checkout] --> build[Build e testes]
+        build --> image[Construir imagem]
+        image --> cluster[Terraform: cluster]
+        cluster --> load[Carregar imagem no kind]
+        load --> database[Terraform: banco e migração]
+        database --> addons[Terraform: addons]
+        addons --> deploy[Aplicar API + HPA + Ingress]
+    end
+    deploy -. Reproduz ambiente local em runner isolado .-> kind

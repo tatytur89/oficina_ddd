@@ -7,6 +7,7 @@ import br.com.fiap.adapters.in.web.DTO.OrdemServico.OrdemServicoResponse;
 import br.com.fiap.domain.entities.OrdemServico;
 import br.com.fiap.domain.valueobjects.Preco;
 import br.com.fiap.domain.valueobjects.StatusOS;
+import br.com.fiap.ports.in.CriarOrdemServicoCommand;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -17,17 +18,18 @@ import static org.junit.jupiter.api.Assertions.*;
 class OrdemServicoMapperTest {
 
     @Test
-    void deveMapearCreateRequestParaDominio() {
+    void deveMapearCreateRequestParaComando() {
         OrdemServicoCreateRequest dto = new OrdemServicoCreateRequest(
                 1L, 1L, "Barulho no freio"
         );
 
-        OrdemServico os = OrdemServicoMapper.toDomain(dto);
+        CriarOrdemServicoCommand comando = OrdemServicoMapper.toCommand(dto);
 
-        assertNull(os.getId());
-        assertEquals(1L, os.getClienteId());
-        assertEquals(1L, os.getVeiculoId());
-        assertEquals("Barulho no freio", os.getObservacoes());
+        assertEquals(1L, comando.clienteId());
+        assertEquals(1L, comando.veiculoId());
+        assertEquals("Barulho no freio", comando.observacoes());
+        assertTrue(comando.servicos().isEmpty());
+        assertTrue(comando.pecas().isEmpty());
     }
 
     @Test

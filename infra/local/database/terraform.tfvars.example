@@ -1,0 +1,2 @@
+# Somente laboratorio local. Mantenha a senha igual ao secret.env da aplicacao.
+database_password = "local-development-password"

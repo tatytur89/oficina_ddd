@@ -6,12 +6,12 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.security.crypto.password.PasswordEncoder;
 
-import br.com.fiap.adapters.out.security.TokenService;
 import br.com.fiap.application.exceptions.InvalidCredentialsException;
 import br.com.fiap.domain.entities.Usuario;
 import br.com.fiap.ports.out.UsuarioRepositoryPort;
+import br.com.fiap.ports.out.PasswordVerifierPort;
+import br.com.fiap.ports.out.TokenGeneratorPort;
 
 import java.util.Optional;
 
@@ -22,13 +22,13 @@ import static org.mockito.Mockito.*;
 class AuthServiceTest {
 
     @Mock
-    private TokenService tokenService;
+    private TokenGeneratorPort tokenService;
 
     @Mock
     private UsuarioRepositoryPort usuarioRepository;
 
     @Mock
-    private PasswordEncoder passwordEncoder;
+    private PasswordVerifierPort passwordEncoder;
 
     @InjectMocks
     private AuthService authService;
@@ -38,12 +38,14 @@ class AuthServiceTest {
     void deveAutenticarComSucesso() {
         Usuario usuario = new Usuario(1L, "admin", "hash-da-senha", "ROLE_ADMIN");
         when(usuarioRepository.buscarPorUsername("admin")).thenReturn(Optional.of(usuario));
-        when(passwordEncoder.matches("admin123", "hash-da-senha")).thenReturn(true);
+        when(passwordEncoder.verificar("admin123", "hash-da-senha")).thenReturn(true);
         when(tokenService.gerarToken("admin")).thenReturn("token-jwt-gerado");
 
         String resultado = authService.autenticar("admin", "admin123");
 
         assertEquals("token-jwt-gerado", resultado);
+        verify(passwordEncoder).verificar("admin123", "hash-da-senha");
+        verify(tokenService).gerarToken("admin");
     }
 
     @Test
@@ -53,6 +55,7 @@ class AuthServiceTest {
 
         assertThrows(InvalidCredentialsException.class, () -> authService.autenticar("desconhecido", "qualquer"));
         verify(tokenService, never()).gerarToken(any());
+        verifyNoInteractions(passwordEncoder);
     }
 
     @Test
@@ -60,7 +63,7 @@ class AuthServiceTest {
     void deveLancarInvalidCredentialsExceptionParaSenhaIncorreta() {
         Usuario usuario = new Usuario(1L, "admin", "hash-da-senha", "ROLE_ADMIN");
         when(usuarioRepository.buscarPorUsername("admin")).thenReturn(Optional.of(usuario));
-        when(passwordEncoder.matches("senhaErrada", "hash-da-senha")).thenReturn(false);
+        when(passwordEncoder.verificar("senhaErrada", "hash-da-senha")).thenReturn(false);
 
         assertThrows(InvalidCredentialsException.class, () -> authService.autenticar("admin", "senhaErrada"));
         verify(tokenService, never()).gerarToken(any());

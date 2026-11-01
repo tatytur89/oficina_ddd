@@ -52,7 +52,9 @@ public class OpenApiConfig {
             - **Ordens de Serviço**: Fluxo completo com máquina de estados
             
             ## Autenticação
-            Todos os endpoints (exceto login e acompanhamento de OS) requerem autenticação JWT.
+            As rotas administrativas requerem JWT. Acompanhamento e decisões externas de orçamento
+            usam a chave de acesso da OS; a decisão também exige a versão do orçamento.
+            Login, informações da aplicação e saúde possuem acesso público.
             
             ### Como obter um token:
             1. Acesse `POST /api/v1/auth/login` com suas credenciais
@@ -60,16 +62,17 @@ public class OpenApiConfig {
             
             ## Máquina de Estados da OS
             ```
-            Recebida → Em Andamento → Aguardando Aprovação → Aprovada → Em Execução → Concluída → Entregue
+            Recebida → Em Diagnóstico → Aguardando Aprovação → Em Execução → Finalizada → Entregue
             ```
-            Em qualquer transição (exceto Entregue/Cancelada), a OS pode ser **Cancelada**.
+            A aprovação inicia a execução e baixa estoque. A recusa retorna ao diagnóstico,
+            preservando os itens para revisão. Cada reenvio gera uma nova versão do orçamento.
             
             ## Formato de Datas
             Todos os campos de data utilizam o formato ISO 8601: `AAAA-MM-DDTHH:mm:ss`
             
-            ## Limites da API
-            - Máximo de 100 itens por paginação
-            - Taxa limit: 100 requisições por minuto por cliente
+            ## Fila Operacional
+            Prioridade: Execução, Aguardando Aprovação, Diagnóstico, Recebida.
+            Mais antigas primeiro dentro do status; finalizadas e entregues permanecem no histórico.
             """;
     }
 

@@ -6,6 +6,57 @@ Projeto Spring Boot desenvolvido para o Tech Challenge da FIAP.
 
 Sistema de gestão para uma oficina mecânica, cobrindo cadastro de clientes, veículos, serviços e peças, além do fluxo completo de ordens de serviço (criação, diagnóstico, orçamento, execução e entrega). Aplicação Java com Spring Boot, usando Maven Wrapper para facilitar a execução sem precisar instalar Maven globalmente.
 
+## Objetivos da Fase 2
+
+Evoluir a aplicação da Fase 1 com arquitetura hexagonal, testes dos fluxos críticos, abertura de OS com itens, decisão externa de orçamento e fila operacional por prioridade e antiguidade. A infraestrutura usa Docker, Kubernetes com escalabilidade por CPU, Terraform para cluster e banco e pipeline de build, testes, imagem, migrações e deploy. As mudanças de status podem gerar avisos SMTP em HTML após o commit da transação.
+
+O ambiente escolhido para reprodução e avaliação é **local, com kind**, sem exigir conta AWS. A configuração AWS permanece disponível como alternativa manual.
+
+## Arquitetura da solução e fluxo de deploy
+
+![Arquitetura local, componentes e fluxo CI/CD](docs/arquitetura-local.svg)
+
+[Abrir o desenho completo](docs/arquitetura-local.svg) · [Fonte Mermaid editável](docs/arquitetura-local.mmd).
+
+O cliente acessa `127.0.0.1:8090` com `Host: oficina.local`. Traefik encaminha para o Service e os Pods Spring Boot. O HPA usa métricas reais do Metrics Server e controla de duas a cinco réplicas. Os adaptadores JPA acessam PostgreSQL com PVC; um Job aplica o schema versionado. Após confirmar uma mudança de status, o adaptador SMTP envia HTML e texto alternativo ao cliente. O domínio permanece separado desses mecanismos.
+
+O fluxo de entrega é: **checkout → build/testes → imagem Docker → Terraform/kind → imagem nos nós → Terraform/PostgreSQL e migrações → Terraform/addons → Secrets/ConfigMap e manifests → rollout da API com Ingress/HPA → limpeza do ambiente CI**. O cluster de avaliação na máquina e o cluster temporário do runner têm estados independentes.
+
+## Início rápido para avaliação
+
+```bash
+git clone --branch isac https://github.com/tatytur89/oficina_ddd.git
+cd oficina_ddd
+docker compose up --build
+```
+
+- Swagger: `http://localhost:8089/swagger-ui/index.html`.
+- Login Compose: `POST /api/v1/auth/login`, corpo `{"usuario":"admin","senha":"admin123"}`; use o token Bearer nas rotas administrativas.
+- [Collection completa Postman](postman/Oficina-DDD.postman_collection.json).
+- A conta SMTP de avaliação é carregada de `k8s/local/mail.env`; cadastre no cliente o destinatário autorizado e abra/altere uma OS para receber o aviso. [Configuração e comportamento do e-mail HTML](docs/EMAIL_STATUS.md).
+
+Para Kubernetes local, siga nesta ordem: [cluster Terraform](infra/local/README.md), [PostgreSQL e migrações](infra/local/database/README.md), [Traefik e métricas](infra/local/addons/README.md) e [deploy da aplicação](k8s/local/README.md). O script de deploy carrega a configuração SMTP de avaliação automaticamente no namespace principal. O Docker Compose precisa de suporte a `env_file.required` (Compose 2.24 ou superior).
+
+## CI/CD
+
+O workflow [CI Pipeline](.github/workflows/ci-pipeline.yml) contém build Java, testes automatizados, construção da imagem e entrega em um cluster kind temporário Linux. O runner usa a raiz [infra/ci](infra/ci/README.md), reaproveita os módulos de banco/addons e aplica o overlay local com a imagem do commit. O deploy do banco e a execução do Job de migrações precedem o rollout da API. A coleta de diagnóstico e a limpeza são automáticas.
+
+Os gatilhos automáticos atendem pushes e pull requests para `main` e `dev`; a execução manual permite selecionar outra referência. A branch `isac` não dispara testes automaticamente a cada push. A pipeline mantém SMTP desabilitado para não enviar e-mails durante a automação. O workflow [Deploy AWS manual](.github/workflows/cd-pipeline.yml) é uma alternativa opt-in, dependente de infraestrutura e `KUBE_CONFIG` próprios; não é disparado pela entrega local.
+
+A [execução de validação da versão final](https://github.com/tatytur89/oficina_ddd/actions/runs/41149491761), referente ao commit `e76dac1b4ab7b7594401ea60b4184b49724629e4` da branch `isac`, foi concluída com sucesso:
+
+- Verificação Java: 475 testes contabilizados, sendo 472 aprovados e 3 ignorados, sem falhas ou erros; verificação de cobertura aprovada.
+- Construção da imagem Docker, provisionamento do cluster Kubernetes e do PostgreSQL, execução das migrações e deploy da API aprovados.
+- Verificação de saúde e identificação do commit pela API via Ingress aprovadas; limpeza do ambiente temporário concluída.
+
+Para repetir a entrega, abra [GitHub Actions](https://github.com/tatytur89/oficina_ddd/actions/workflows/ci-pipeline.yml), selecione **Run workflow** e escolha a branch `isac`. O cluster criado pelo runner é temporário e removido ao final; a execução não mantém uma aplicação pública hospedada. Para reproduzir o ambiente na máquina, siga as instruções de Kubernetes local acima.
+
+## Entrega acadêmica
+
+A gravação do vídeo será realizada por uma integrante da equipe. Conforme o edital, o vídeo deve ter até 15 minutos e mostrar deploy, execução do CI/CD, consumo das APIs e escala automática. O link público ou não listado no YouTube/Vimeo será incluído nesta seção quando estiver disponível.
+
+O PDF para envio no portal deve reunir o [repositório na branch de entrega](https://github.com/tatytur89/oficina_ddd/tree/isac), o [desenho da arquitetura](docs/arquitetura-local.svg) e o link do vídeo. O responsável pelo repositório deve confirmar o compartilhamento com `soat-architecture` antes do envio.
+
 ## Arquitetura
 
 O projeto segue arquitetura hexagonal (ports & adapters) com Domain-Driven Design:
@@ -16,56 +67,130 @@ O projeto segue arquitetura hexagonal (ports & adapters) com Domain-Driven Desig
 - `adapters/in/web` — controllers REST, DTOs e mappers
 - `adapters/out/persistence` — adaptadores JPA/PostgreSQL
 - `adapters/out/security` — autenticação JWT
+- `adapters/out/notification` — publicação transacional e envio SMTP de status
+
+## Ambientes de execução
+
+O código da aplicação é compartilhado. As configurações de desenvolvimento, laboratório local e AWS são selecionadas explicitamente:
+
+| Ambiente | Perfil Spring | Configuração da infraestrutura |
+|---|---|---|
+| Maven na máquina | `local` (padrão) | PostgreSQL em localhost |
+| Docker Compose | `docker`, com configurações locais | `docker-compose.yaml` |
+| Kubernetes local | `lab` | `k8s/local/` e raiz Terraform `infra/local/` |
+| AWS/EKS | `aws` | `k8s/aws/`, Terraform `infra/` e `infra/addons/` |
+
+`k8s/base/` contém apenas os recursos comuns. Escolha `k8s/local` ou `k8s/aws` ao renderizar/aplicar; não aplique a pasta raiz recursivamente. Os perfis `lab` e `aws` exigem credenciais externas e validam o schema. Os valores padrão de desenvolvimento ficam restritos aos perfis locais.
+
+O cluster local é provisionado por [Terraform e kind](infra/local/README.md). O [PostgreSQL e suas migrações](infra/local/database/README.md) usam uma raiz Terraform independente. O [deploy da aplicação local](k8s/local/README.md) constrói a imagem, carrega nos nós e aplica a configuração `lab`. Renderizar os manifests não comprova que a infraestrutura está em execução. Consulte também [as configurações Kubernetes](k8s/README.md) e [as raízes Terraform](infra/README.md).
 
 ## Por que PostgreSQL
 
 O PostgreSQL foi escolhido por ser um banco relacional maduro, open-source, com suporte nativo e bem documentado no ecossistema Spring Data JPA. O domínio da oficina é fortemente relacional (cliente → veículo → ordem de serviço → peças/serviços, com chaves estrangeiras e integridade referencial reforçada na camada de aplicação), o que se encaixa melhor num modelo relacional do que num banco não-relacional. O PostgreSQL também tem excelente suporte a tipos numéricos precisos (`NUMERIC`), importante para valores monetários, e é o banco padrão de fato em ambientes de produção Java/Spring, o que reduz o custo de operação e manutenção.
 
-## Pré-requisitos
+## Executar localmente
 
-Antes de rodar o projeto, certifique-se de ter instalado:
+### Pré-requisitos
 
-- Java 21 JDK
 - Git
+- Docker com o plugin Compose (`docker compose version`)
+- Java 21 JDK (`java -version` deve mostrar 21.x) — necessário apenas para rodar com Maven ou executar os testes
 
-### Verificando a instalação do Java
-
-No terminal, execute:
+No Linux, se o Docker retornar `permission denied ... docker.sock`, adicione seu usuário ao grupo `docker` e abra uma nova sessão (ou rode `newgrp docker`):
 
 ```bash
-java -version
+sudo usermod -aG docker $USER
 ```
 
-Você deve ver uma versão 21.x.
-
-## Começando
-
-Clone o repositório e entre na pasta do projeto:
+### Clonar o repositório
 
 ```bash
-git clone https://github.com/robert-portilho/oficina-ddd
-git cd oficina-ddd
-```
-
-Se necessário, conceda permissão de execução ao Maven Wrapper:
-
-```bash
+git clone https://github.com/tatytur89/oficina_ddd.git
+cd oficina_ddd
 chmod +x mvnw
 ```
 
-## Comandos principais
+### Pré-requisitos para Kubernetes local
 
-### Executar a aplicação
+Para o laboratório Kubernetes local, disponibilize as ferramentas abaixo. As versões indicadas foram verificadas na preparação do ambiente em 29/10/2026:
+
+| Ferramenta | Versão verificada | Finalidade |
+|---|---|---|
+| Docker Engine | 29.4.2 | Executar containers Linux |
+| Docker Compose | 5.1.3 | Ambiente de desenvolvimento |
+| Terraform | 1.17.1 | Provisionamento como código |
+| kind | 0.33.0 | Cluster Kubernetes local em containers |
+| kubectl | 1.34.1 | Operação e inspeção do cluster |
+| Helm | 3.22.1 | Instalação de componentes do cluster |
+
+Instale os binários pelas fontes oficiais e confira os checksums publicados: [Terraform](https://developer.hashicorp.com/terraform/install), [kind](https://kind.sigs.k8s.io/docs/user/quick-start/) e [Helm](https://helm.sh/docs/intro/install/). Mantenha os executáveis no PATH e abra um novo terminal após a instalação. No Windows, use o Docker Desktop com backend WSL 2 e containers Linux.
+
+Verifique as ferramentas e a comunicação com o Docker:
 
 ```bash
+docker version
+docker compose version
+terraform version
+kind version
+kubectl version --client
+helm version --short
+docker run --rm hello-world
+```
+
+O teste `hello-world` deve terminar com sucesso e remover seu próprio container. A imagem permanece no cache. Como referência inicial para o laboratório, reserve 4 CPUs, 8 GiB de memória para o Docker e 20 GiB livres para imagens e dados; a carga real será medida durante o deploy e os testes de escala.
+
+Essa verificação prepara as ferramentas, mas não cria o cluster, não provisiona recursos AWS e não valida o deploy. A imagem Kubernetes escolhida para o kind deverá ser compatível com a versão do kubectl. A configuração Terraform e os manifests AWS existentes são descritos nas seções próprias abaixo.
+
+### Banco de dados
+
+O perfil `local` usa `spring.jpa.hibernate.ddl-auto=update`: ao subir, o Hibernate cria/atualiza as tabelas em um banco vazio. O perfil `docker` mantém esse comportamento para desenvolvimento com Compose. Os perfis `lab` e `aws` usam `validate` e exigem preparação prévia do schema. No laboratório, siga [PostgreSQL e migrações](infra/local/database/README.md); o Terraform executa o SQL versionado antes do deploy. Para AWS, veja [Deploy no Kubernetes](#deploy-no-kubernetes).
+
+Ao iniciar, a aplicação cria o usuário administrador padrão `admin` / `admin123` (configurável pelas variáveis `ADMIN_USER` e `ADMIN_PASSWORD`).
+
+### Opção 1: Docker Compose (aplicação + PostgreSQL)
+
+```bash
+docker compose up --build
+```
+
+- API: `http://localhost:8089`
+- Swagger: `http://localhost:8089/swagger-ui/index.html`
+- PostgreSQL: `localhost:5432` (banco `oficina_db`, usuário `oficina_user`, senha `password123`)
+
+Para parar (adicione `-v` para apagar também os dados do banco):
+
+```bash
+docker compose down
+```
+
+### Opção 2: Maven (aplicação na máquina, PostgreSQL no Docker)
+
+Suba apenas o banco e depois a aplicação:
+
+```bash
+docker compose up -d postgres
 ./mvnw spring-boot:run
 ```
 
-A aplicação ficará disponível em:
+- API: `http://localhost:8080`
+- Swagger: `http://localhost:8080/swagger-ui/index.html`
 
-```text
-http://localhost:8080
+A aplicação espera o PostgreSQL em `localhost:5432` com as credenciais acima (veja `src/main/resources/application.properties`).
+
+### Porta 5432 ocupada
+
+Se já houver outro PostgreSQL usando a porta 5432, o Compose falha ao publicar o banco (ou a aplicação via Maven conecta no banco errado e retorna `password authentication failed for user "oficina_user"`). Pare o outro PostgreSQL ou altere a porta publicada em `docker-compose.yaml` para `"5433:5432"`; nesse caso, ao rodar via Maven, informe a nova porta:
+
+```bash
+SPRING_DATASOURCE_URL=jdbc:postgresql://localhost:5433/oficina_db ./mvnw spring-boot:run
 ```
+
+### Testar a API
+
+1. Autentique com `POST /api/v1/auth/login` usando `admin` / `admin123` (veja [Autenticação](#autenticação)).
+2. Use o token no Swagger (`Authorize`) ou importe a coleção `postman/Oficina-DDD.postman_collection.json` no Postman ou no Bruno (`Import Collection → Postman Collection`). A coleção aponta para `http://localhost:8089` (Docker Compose); ao rodar via Maven, troque para a porta `8080`.
+
+## Comandos Maven
 
 ### Executar testes
 
@@ -91,26 +216,98 @@ http://localhost:8080
 ./mvnw clean install
 ```
 
-## Executar com Docker Compose
+## Configuração do Kubernetes local
 
-Para subir a aplicação e o banco PostgreSQL via Docker Compose:
+A configuração local usa o namespace `oficina-local`, a imagem `oficina-ddd:local` e o perfil `lab`. Ela não referencia EKS, RDS, ALB ou credenciais AWS. Prepare o arquivo local de desenvolvimento e confira a renderização:
 
-```bash
-docker compose up --build
+```powershell
+Copy-Item k8s/local/secret.env.example k8s/local/secret.env
+kubectl kustomize k8s/local
 ```
 
-A aplicação estará disponível em:
+`secret.env` é ignorado pelo Git. A saída renderizada contém os valores do Secret codificados; não a publique. Esse comando não acessa o cluster e não realiza deploy. Prepare o banco com [sua raiz Terraform](infra/local/database/README.md) e mantenha as credenciais iguais às do Secret da aplicação. Instale [Traefik e metrics-server](infra/local/addons/README.md) e execute [o script de build e deploy](k8s/local/README.md). O Ingress atende HTTP em loopback e o HPA ajusta de 2 a 5 réplicas por CPU.
 
-```text
-http://localhost:8089
+## Deploy no Kubernetes
+
+Os manifests em `k8s/aws/` publicam a API no EKS usando PostgreSQL externo e o perfil `aws`. A alternativa **Deploy AWS manual** é iniciada explicitamente no GitHub Actions, publica a imagem `sha-<commit>` no GHCR e aplica o overlay AWS. Configure `KUBE_CONFIG` para seu cluster e prepare banco, schema e Secrets antes de acioná-la. A imagem precisa estar acessível ao cluster. O fluxo CI/CD principal de avaliação usa kind temporário e provisiona o banco automaticamente.
+
+Antes do primeiro deploy automatizado, crie o namespace `oficina-api` e o Secret `oficina-api-secret` no cluster. O workflow verifica se esse Secret existe e não aplica `secret.yaml.example`, que contém apenas valores placeholder.
+
+Para aplicar os manifests manualmente:
+
+1. Publique a imagem pelo workflow **Build and Push Docker Image** em Actions e anote uma tag existente no GHCR (por exemplo, `sha-<sha-curto>`). Atualize `images.newTag` em `k8s/aws/kustomization.yaml` com essa tag.
+2. Ajuste o host e, se necessário, `ingressClassName` em `k8s/aws/ingress.yaml`. O cluster precisa ter um controlador Ingress instalado e DNS apontando para ele.
+3. Copie `k8s/aws/secret.yaml.example` para `k8s/aws/secret.yaml` e substitua todos os valores `REPLACE_WITH_...` pela URL JDBC e credenciais do banco externo, segredo JWT aleatório (mínimo de 32 bytes) e credenciais do administrador. O arquivo real é ignorado pelo Git; não versione segredos. O exemplo não deve ser aplicado sem edição.
+4. Crie o namespace (uma vez) e aplique os recursos:
+
+```powershell
+$eksContext = 'SEU_CONTEXTO_EKS'
+kubectl --context $eksContext create namespace oficina-api
+kubectl --context $eksContext apply -n oficina-api -f k8s/aws/secret.yaml
+kubectl --context $eksContext apply -n oficina-api -k k8s/aws
+kubectl --context $eksContext rollout status -n oficina-api deployment/oficina-api
 ```
+
+No PowerShell, use `Copy-Item k8s/aws/secret.yaml.example k8s/aws/secret.yaml` para copiar o exemplo. Se o pacote GHCR for privado, crie um `imagePullSecret` no namespace e adicione a referência ao Deployment pela configuração AWS. O Ingress de exemplo não configura TLS; em produção, configure um certificado apropriado.
+
+O Service expõe a porta 80 e encaminha para a porta 8080 do container no Deployment. As probes usam os endpoints de liveness/readiness do Actuator, liberados sem autenticação para uso pelo Kubernetes; a readiness também considera a conexão ao banco. O `ConfigMap` guarda apenas configurações não sensíveis; credenciais ficam no `Secret`. Os valores de `resources` são uma base inicial e devem ser ajustados conforme o consumo observado no cluster.
+
+O perfil `aws` está configurado com `spring.jpa.hibernate.ddl-auto=validate`: prepare previamente o schema do banco externo para corresponder à aplicação. Esses manifests não criam tabelas nem executam migrações.
+
+## Infraestrutura AWS com Terraform
+
+A configuração em `infra/` cria uma VPC em duas zonas, EKS com nós privados, PostgreSQL RDS privado e criptografado com senha gerenciada pelo Secrets Manager, regras de rede e a role IAM do AWS Load Balancer Controller. O controller é instalado por uma segunda configuração Terraform em `infra/addons/`, depois que o cluster já existe; isso evita inicializar o provider Kubernetes antes do EKS estar disponível.
+
+Você precisa de Terraform 1.5+, AWS CLI, `kubectl`, Helm 3 e credenciais AWS com permissões para criar EKS, VPC, RDS, IAM e Secrets Manager. Configure o perfil AWS e copie o exemplo de variáveis no PowerShell:
+
+```powershell
+Copy-Item infra\terraform.tfvars.example infra\terraform.tfvars
+```
+
+Edite `infra/terraform.tfvars`, substituindo `REPLACE_WITH_YOUR_PUBLIC_IP/32` pelo seu IP público e escolhendo região/valores apropriados. O CIDR `0.0.0.0/0` é rejeitado para proteger o endpoint público do EKS. Em seguida:
+
+```powershell
+terraform -chdir=infra init
+terraform -chdir=infra plan
+terraform -chdir=infra apply
+$region = terraform -chdir=infra output -raw aws_region
+$cluster = terraform -chdir=infra output -raw cluster_name
+aws eks update-kubeconfig --region $region --name $cluster
+terraform -chdir=infra/addons init
+$vpc = terraform -chdir=infra output -raw vpc_id
+$controllerRole = terraform -chdir=infra output -raw aws_load_balancer_controller_role_arn
+terraform -chdir=infra/addons apply `
+  -var="aws_region=$region" `
+  -var="cluster_name=$cluster" `
+  -var="vpc_id=$vpc" `
+  -var="controller_role_arn=$controllerRole"
+$eksContext = 'SEU_CONTEXTO_EKS'
+kubectl --context $eksContext create namespace oficina-api
+Copy-Item k8s/aws/secret.yaml.example k8s/aws/secret.yaml
+```
+
+Abra no AWS Secrets Manager o ARN exibido por `terraform -chdir=infra output -raw database_master_secret_arn` e copie a senha gerenciada pelo RDS para `SPRING_DATASOURCE_PASSWORD` em `k8s/aws/secret.yaml`. Preencha também `SPRING_DATASOURCE_URL` usando o endpoint de `terraform -chdir=infra output -raw database_endpoint`, e defina valores fortes para `JWT_SECRET`, `ADMIN_USER` e `ADMIN_PASSWORD`. Depois aplique os manifests no contexto EKS escolhido:
+
+```powershell
+kubectl --context $eksContext apply -n oficina-api -f k8s/aws/secret.yaml
+kubectl --context $eksContext apply -n oficina-api -k k8s/aws
+kubectl --context $eksContext rollout status -n oficina-api deployment/oficina-api
+kubectl --context $eksContext get ingress -n oficina-api oficina-api
+```
+
+Não coloque credenciais em `terraform.tfvars`, no Git ou na linha de comando. Se a imagem GHCR for privada, crie um `imagePullSecret` no namespace e referencie-o no Deployment.
+
+O RDS é criado sem tabelas. Como o perfil `aws` usa `spring.jpa.hibernate.ddl-auto=validate`, prepare o schema antes dos Pods. O schema inicial completo está em `src/main/resources/db/migration/V001__initial_schema.sql` e o runner versionado em `database/migrate.sh`; forneça as variáveis `PGHOST`, `PGPORT`, `PGDATABASE`, `PGUSER` e `PGPASSWORD` em um ambiente com acesso ao RDS. O SQL `docs/sql/orcamento-decisao.sql` serve apenas para atualização incremental de bancos anteriores. O deploy AWS manual pressupõe essa preparação; a pipeline local executa o Job automaticamente.
+
+Por padrão, a configuração usa nós `t3.medium`, RDS `db.t4g.micro`, um NAT Gateway e banco Single-AZ; esses recursos e o endpoint EKS geram cobrança contínua na AWS. A aplicação usa a senha mestra do RDS neste exemplo; para produção, crie um usuário PostgreSQL exclusivo com privilégios mínimos e use suas credenciais no Secret. O RDS tem proteção contra exclusão habilitada; para removê-lo intencionalmente, altere `database_deletion_protection` para `false`, aplique essa mudança e só então destrua a infraestrutura. Antes de destruir o cluster, remova o Ingress/ALB e o controller (`kubectl --context $eksContext delete ingress -n oficina-api oficina-api` e `terraform -chdir=infra/addons destroy`, informando os mesmos valores `-var` usados ao aplicar); o snapshot final do banco permanece na AWS e pode continuar gerando custo. A escalabilidade horizontal é feita pelo `k8s/aws/hpa.yaml`: o HPA mantém de 2 a 5 réplicas conforme a CPU (alvo de 70% do `request`), usando o metrics-server instalado por `infra/addons/`. O Deployment não fixa `replicas`, para não conflitar com o HPA. Para testes curtos, use o perfil `infra/estudante.tfvars.example` (mantém os nós padrão; apenas desliga a proteção contra exclusão e o snapshot final do RDS) e, ao terminar, rode `./scripts/destroy.sh` (bash): ele remove o Ingress e espera o ALB sumir, destrói o controller e a infraestrutura principal e lista qualquer recurso que tenha ficado cobrando. O ALB é HTTP; configure certificado ACM e TLS antes de expor dados reais. O estado local do Terraform deve ser protegido e migrado para backend remoto criptografado/lock antes de uso por equipe ou produção.
 
 ## Interface Swagger
 
 A documentação interativa da API pode ser acessada em:
 
 ```text
-http://localhost:8080/swagger-ui/index.html
+http://localhost:8080/swagger-ui/index.html   (Maven)
+http://localhost:8089/swagger-ui/index.html   (Docker Compose)
 ```
 
 ## Formato padrão de resposta
@@ -174,7 +371,7 @@ Authorization: Bearer <token>
 
 No Swagger UI, clique em `Authorize`, cole o token JWT e confirme. Em seguida, utilize o botão `Try it out` nos endpoints protegidos.
 
-Todas as rotas administrativas exigem autenticação, exceto: login, Swagger UI e a consulta pública de acompanhamento de OS (`GET /api/v1/ordens-servico/{id}/acompanhar`).
+As rotas administrativas exigem JWT. Login, Swagger, healthcheck, informações de versão e a página de acompanhamento são públicos. A página valida a chave própria da OS; o callback `POST /api/v1/ordens-servico/{id}/decisao-orcamento` não exige JWT e autentica a decisão pela `chave` da OS enviada no corpo, junto com a versão do orçamento.
 
 ## Endpoints de clientes
 
@@ -307,19 +504,33 @@ Base: `/api/v1/ordens-servico`
 | Método | Rota | Descrição |
 |---|---|---|
 | POST | `/api/v1/ordens-servico` | Criar OS |
-| GET | `/api/v1/ordens-servico` | Listar todas as OS (administrativo) |
+| GET | `/api/v1/ordens-servico` | Listar fila operacional de OS por prioridade e antiguidade |
 | GET | `/api/v1/ordens-servico/{id}` | Buscar OS por ID |
 | GET | `/api/v1/ordens-servico/cliente/{clienteId}` | Listar OS de um cliente |
 | GET | `/api/v1/ordens-servico/status/{status}` | Listar OS por status |
 | GET | `/api/v1/ordens-servico/periodo?inicio={data}&fim={data}` | Listar OS abertas num período |
 | PATCH | `/api/v1/ordens-servico/{id}/orcamento` | Enviar orçamento para aprovação |
+| POST | `/api/v1/ordens-servico/{id}/decisao-orcamento` | Receber aprovação ou recusa externa por chave e versão do orçamento, sem JWT |
 | PATCH | `/api/v1/ordens-servico/{id}/status/{status}` | Atualizar status da OS |
 | POST | `/api/v1/ordens-servico/{id}/diagnostico` | Registrar o diagnóstico completo (transiciona para `EM_DIAGNOSTICO` + adiciona serviços/peças numa só chamada) |
 | POST | `/api/v1/ordens-servico/{id}/servicos` | Adicionar um serviço à OS (exige `EM_DIAGNOSTICO`) |
 | POST | `/api/v1/ordens-servico/{id}/pecas` | Adicionar uma peça à OS (exige `EM_DIAGNOSTICO`) |
 | GET | `/api/v1/ordens-servico/metricas/tempo-medio-execucao` | Tempo médio de execução das OS finalizadas |
 
-A resposta autenticada da OS (criar, listar, buscar por ID) inclui o campo `chaveAcesso` — é essa chave que a equipe administrativa repassa ao cliente (não há integração de e-mail/SMS no projeto) para ele acessar a página pública de acompanhamento descrita abaixo.
+### Fila operacional e histórico
+
+`GET /api/v1/ordens-servico` retorna apenas as OS em atendimento, nesta ordem de prioridade:
+
+1. `EM_EXECUCAO`
+2. `AGUARDANDO_APROVACAO`
+3. `EM_DIAGNOSTICO`
+4. `RECEBIDA`
+
+Dentro de cada status, as OS são ordenadas por data de abertura crescente (mais antigas primeiro), com ID crescente para desempatar datas iguais. `FINALIZADA` e `ENTREGUE` ficam fora dessa fila por filtro de consulta; nenhum registro é apagado ou alterado por essa listagem.
+
+O histórico continua disponível nas consultas por ID, cliente, status e período. Por exemplo, `GET /api/v1/ordens-servico/status/FINALIZADA` permite consultar OS finalizadas. A métrica de tempo médio também continua considerando as OS concluídas, independentemente do filtro da fila.
+
+A resposta autenticada da OS (criar, listar, buscar por ID) inclui o campo `chaveAcesso`, que a equipe administrativa repassa ao cliente para acessar a página pública de acompanhamento. A [integração SMTP de avisos de status](docs/EMAIL_STATUS.md) envia o ID e o status após o commit, sem incluir essa chave ou outros tokens. O envio é habilitado por configuração externa e permanece desabilitado por padrão.
 
 Exemplo de corpo (criar OS):
 
@@ -327,23 +538,29 @@ Exemplo de corpo (criar OS):
 {
   "clienteId": 1,
   "veiculoId": 1,
-  "observacoes": "Ruído no freio dianteiro"
+  "observacoes": "Ruído no freio dianteiro",
+  "servicos": [{ "servicoId": 1, "quantidade": 1 }],
+  "pecas": [{ "pecaId": 1, "quantidade": 1 }]
 }
 ```
 
-A OS nasce em `RECEBIDA` só com a observação do problema relatado — sem serviços/peças nem previsão de entrega ainda, já que essas informações só fazem sentido depois do diagnóstico (não dá pra estimar prazo antes de saber o que precisa ser feito). Depois, o diagnóstico pode ser registrado de duas formas:
+A abertura recebe IDs de cliente e veículo já cadastrados e pode incluir serviços e peças solicitados, com IDs de catálogo e quantidades positivas. As listas `servicos` e `pecas` são opcionais: podem ser omitidas ou enviadas vazias para manter o fluxo de abertura sem itens.
+
+A OS nasce em `RECEBIDA`, com identificação única e chave de acesso. Os itens informados são registrados com nome e preço do catálogo no momento da abertura, e os totais de serviços, peças e da OS são calculados automaticamente. A abertura não define previsão de entrega, não aprova o orçamento e não baixa estoque.
+
+O diagnóstico continua sendo uma etapa posterior. Ele preserva os itens da abertura e **acrescenta** os itens enviados, sem substituir nem deduplicar automaticamente os anteriores. Não reenvie os mesmos itens apenas para confirmá-los. Para iniciar o diagnóstico e definir a previsão sem acrescentar itens:
 
 ```json
 // POST /api/v1/ordens-servico/{id}/diagnostico
-// Transiciona para EM_DIAGNOSTICO, registra os itens e a previsão de entrega numa chamada só
+// Transiciona para EM_DIAGNOSTICO e define a previsão, preservando os itens da abertura
 {
-  "servicos": [{ "servicoId": 1, "quantidade": 1 }],
-  "pecas": [{ "pecaId": 1, "quantidade": 1 }],
+  "servicos": [],
+  "pecas": [],
   "dataPrevistaEntrega": "2026-08-30T18:00:00"
 }
 ```
 
-Ou, se preferir ajustar item a item (a OS já precisa estar em `EM_DIAGNOSTICO`, via `PATCH /{id}/status/EM_DIAGNOSTICO` ou pelo endpoint acima com listas vazias):
+Se o diagnóstico identificar itens adicionais, inclua-os nas listas dessa chamada ou adicione-os individualmente pelos endpoints abaixo. A adição individual exige `EM_DIAGNOSTICO`, alcançado por `PATCH /{id}/status/EM_DIAGNOSTICO` ou pelo endpoint de diagnóstico:
 
 ```json
 // POST /api/v1/ordens-servico/{id}/servicos
@@ -359,21 +576,54 @@ Ou, se preferir ajustar item a item (a OS já precisa estar em `EM_DIAGNOSTICO`,
 RECEBIDA → EM_DIAGNOSTICO → AGUARDANDO_APROVACAO → EM_EXECUCAO → FINALIZADA → ENTREGUE
 ```
 
-- Serviços e peças só podem ser adicionados à OS em `EM_DIAGNOSTICO`.
-- `enviarOrcamento` exige a OS em `EM_DIAGNOSTICO` e pelo menos um serviço vinculado.
-- Ao transicionar para `EM_EXECUCAO`, o estoque de cada peça vinculada é baixado automaticamente.
-- Não há caminho de cancelamento — cada status só avança para o próximo da lista.
+- A abertura pode registrar serviços e peças solicitados enquanto cria a OS em `RECEBIDA`. Depois de criada, os endpoints de adição de itens exigem `EM_DIAGNOSTICO`.
+- `enviarOrcamento` exige a OS em `EM_DIAGNOSTICO` e pelo menos um serviço vinculado. Cada envio incrementa `versaoOrcamento` e limpa a decisão anterior.
+- A aprovação da versão vigente inicia `EM_EXECUCAO` e baixa o estoque das peças. O PATCH genérico de status não pode iniciar execução. A transição para `AGUARDANDO_APROVACAO`, mesmo pelo PATCH, aplica as validações e o versionamento do envio de orçamento.
+- A recusa retorna de `AGUARDANDO_APROVACAO` para `EM_DIAGNOSTICO`, preserva os itens e não baixa estoque. A equipe pode complementar o diagnóstico e enviar uma nova versão do orçamento.
+
+### Notificação externa de aprovação ou recusa
+
+Após `PATCH /api/v1/ordens-servico/{id}/orcamento`, use a `versaoOrcamento` retornada na resposta. Uma integração externa pode registrar a decisão sem login administrativo, apresentando a chave UUID daquela OS:
+
+```http
+POST /api/v1/ordens-servico/1/decisao-orcamento
+Content-Type: application/json
+```
+
+```json
+{
+  "chave": "UUID-DA-OS",
+  "versaoOrcamento": 1,
+  "aprovado": true
+}
+```
+
+Para recusar, envie `aprovado: false`. Os três campos são obrigatórios. A resposta mantém o envelope `status`, `message` e `dados`; a OS em `dados` inclui `versaoOrcamento` e `decisaoOrcamento` (`true` para aprovação, `false` para recusa e `null` enquanto aguarda decisão).
+
+- A primeira decisão válida recebe `200`. Aprovação inicia a execução; recusa devolve a OS ao diagnóstico.
+- Repetir a mesma decisão para a mesma versão é idempotente: retorna a OS atual com `200`, sem nova gravação nem baixa de estoque.
+- Versão diferente da vigente, decisão contrária à já registrada, chave inválida ou estado incompatível resultam em `400`. OS inexistente resulta em `404`.
+- Depois de um novo envio do orçamento, a versão anterior não pode decidir o orçamento novo. A integração deve usar a versão retornada no novo envio.
+- A decisão usa bloqueio pessimista por OS dentro da transação, serializando callbacks concorrentes da mesma OS. Isso não substitui o controle de concorrência de estoque entre OS diferentes.
+
+Na coleção Postman, **Enviar orçamento** salva `versaoOrcamento` automaticamente. As requisições JSON de aprovação e recusa são alternativas: não execute ambas para a mesma versão esperando sucesso.
+
+### Atualização do schema para a decisão de orçamento
+
+Antes de implantar esta versão sobre um PostgreSQL existente com `ddl-auto=validate`, aplique [`docs/sql/orcamento-decisao.sql`](docs/sql/orcamento-decisao.sql). O script acrescenta `versao_orcamento` e `decisao_orcamento` e pode ser reaplicado. Registros legados sem versão são tratados como versão zero pela leitura da aplicação; a integração deve sempre usar a versão retornada para a OS.
+
+Esse script é uma atualização incremental: não cria o schema inicial nem automatiza o deploy do banco. O provisionamento e a execução controlada das atualizações de schema continuam sendo pré-requisitos do ambiente.
 
 ## Página de acompanhamento, aprovação e avaliação (cliente)
 
-Como o cliente não tem login no sistema, o acompanhamento da OS, a aprovação do orçamento e a avaliação do serviço acontecem por uma página HTML pública, protegida pela `chaveAcesso` gerada para aquela OS específica (não é um endpoint de API JSON):
+Como o cliente não tem login no sistema, o acompanhamento da OS, a aprovação ou recusa do orçamento e a avaliação do serviço também estão disponíveis por uma página HTML pública, protegida pela `chaveAcesso` gerada para aquela OS específica. Essa interface HTML complementa o callback JSON descrito acima:
 
 ```text
 GET  http://localhost:8080/acompanhamento/{id}?chave={chaveAcesso}
 ```
 
 - Mostra o status atual, datas, serviços/peças vinculados e o valor total.
-- Se o status for `AGUARDANDO_APROVACAO`, a página exibe um botão **"Aprovar orçamento"**, que envia `POST /acompanhamento/{id}/aprovar` e transiciona a OS para `EM_EXECUCAO`.
+- Se o status for `AGUARDANDO_APROVACAO`, a página oferece **Aprovar orçamento** e **Recusar orçamento**. Os formulários enviam `chave` e `versaoOrcamento` em campos ocultos para `POST /acompanhamento/{id}/aprovar` ou `POST /acompanhamento/{id}/recusar`. Ambos usam as mesmas regras de versão e idempotência do callback; uma página antiga não aprova uma versão nova.
 - Quando `FINALIZADA`, a página avisa que o veículo está pronto para retirada.
 - Quando `ENTREGUE` e ainda não avaliada, a página exibe um formulário de avaliação (nota de 1 a 5 + comentário opcional), enviado via `POST /acompanhamento/{id}/avaliar`. Depois de avaliada, a página passa a mostrar a nota e o comentário registrados.
 - A `chaveAcesso` **não expira** — permanece válida durante toda a vida da OS, inclusive depois da entrega, já que também é usada para a avaliação.

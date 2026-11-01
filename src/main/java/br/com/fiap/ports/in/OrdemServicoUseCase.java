@@ -7,7 +7,7 @@ import br.com.fiap.domain.entities.OrdemServico;
 import br.com.fiap.domain.valueobjects.StatusOS;
 
 public interface OrdemServicoUseCase {
-    OrdemServico criarOS(OrdemServico os);
+    OrdemServico criarOS(CriarOrdemServicoCommand command);
     OrdemServico realizarDiagnostico(Long osId, List<ItemDiagnostico> servicos, List<ItemDiagnostico> pecas, LocalDateTime dataPrevistaEntrega);
     OrdemServico adicionarServico(Long osId, Long servicoId, int quantidade);
     OrdemServico adicionarPeca(Long osId, Long pecaId, int quantidade);
@@ -19,6 +19,7 @@ public interface OrdemServicoUseCase {
     OrdemServico atualizarStatus(Long id, StatusOS novoStatus);
     OrdemServico enviarOrcamento(Long id);
     OrdemServico aprovarOrcamento(Long id, String chave);
+    OrdemServico decidirOrcamento(Long id, String chave, long versaoOrcamento, boolean aprovado);
     OrdemServico avaliarServico(Long id, String chave, int nota, String comentario);
     OrdemServico buscarParaAcompanhamento(Long id, String chave);
     TempoMedioExecucao calcularTempoMedioExecucao();
