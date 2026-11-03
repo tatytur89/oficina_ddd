@@ -44,6 +44,7 @@ public class OrdemServicoPersistenceAdapter implements OrdemServicoRepositoryPor
         );
         entity.setVersaoOrcamento(os.getVersaoOrcamento());
         entity.setDecisaoOrcamento(os.getDecisaoOrcamento());
+        entity.setExcluidaEm(os.getExcluidaEm());
 
         List<ServicoOSJpaEntity> servicoEntities = os.getServicos().stream()
             .map(s -> new ServicoOSJpaEntity(
@@ -154,7 +155,8 @@ public class OrdemServicoPersistenceAdapter implements OrdemServicoRepositoryPor
             entity.getNotaAvaliacao(),
             entity.getComentarioAvaliacao(),
             entity.getVersaoOrcamento() == null ? 0L : entity.getVersaoOrcamento(),
-            entity.getDecisaoOrcamento()
+            entity.getDecisaoOrcamento(),
+            entity.getExcluidaEm()
         );
     }
 }

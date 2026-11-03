@@ -112,7 +112,7 @@ try {
     $password='db-smoke-'+[Guid]::NewGuid().ToString('N')
     $admin='admin-smoke'
     $adminPassword='admin-smoke-'+[Guid]::NewGuid().ToString('N')
-    $variables=[pscustomobject]@{namespace=$namespace;database_password=$password;kubeconfig_path=$kubeconfig;context='kind-oficina-local'}
+    $variables=[pscustomobject]@{namespace=$namespace;external_secrets=$true;kubeconfig_path=$kubeconfig;context='kind-oficina-local'}
     [IO.File]::WriteAllText((Join-Path $moduleRoot 'smoke.auto.tfvars.json'),($variables|ConvertTo-Json))
     $secretFile=Join-Path $testRoot 'application-secret.env'
     [IO.File]::WriteAllText($secretFile,(@(

@@ -2,7 +2,7 @@
 
 A conta SMTP de avaliação está configurada no arquivo versionado `mail.env`. O script de deploy do namespace principal cria/atualiza `oficina-mail-secret` automaticamente. O modelo enviado inclui HTML/CSS e uma alternativa em texto simples. [Configuração e comportamento dos avisos](../../docs/EMAIL_STATUS.md).
 
-Prepare primeiro o [cluster](../../infra/local/README.md), o [PostgreSQL com migrações](../../infra/local/database/README.md) e os [addons de entrada e métricas](../../infra/local/addons/README.md). Use Windows PowerShell 5.1+, Git, Docker, kind, kubectl e `tar` no PATH. O `tar` do Windows é usado para conferir a configuração da imagem no arquivo carregado nos nós.
+Prepare primeiro o [cluster](../../infra/local/README.md), o [Vault local](../../infra/local/vault/README.md), o [PostgreSQL com migrações](../../infra/local/database/README.md) e os [addons de entrada e métricas](../../infra/local/addons/README.md). Use Windows PowerShell 5.1+, Git, Docker, kind, kubectl e `tar` no PATH. O `tar` do Windows é usado para conferir a configuração da imagem no arquivo carregado nos nós.
 
 ## Build e deploy
 
@@ -15,7 +15,7 @@ Copy-Item k8s/local/secret.env.example k8s/local/secret.env
 powershell.exe -NoProfile -ExecutionPolicy RemoteSigned -File scripts/Deploy-Local.ps1
 ```
 
-Não substitua um `secret.env` já configurado. Os valores do exemplo são somente para desenvolvimento. A senha do banco deve corresponder à definida no Terraform do PostgreSQL. O script exige as seis chaves do exemplo, sem chaves adicionais que sobrescrevam o perfil ou o comportamento de criação de schema. Segredos são fornecidos em runtime e ficam fora do contexto Docker.
+`secret.env` contém somente `JWT_SECRET`; banco e admin são lidos do Vault pelo script de deploy e sincronizados para os Secrets Kubernetes no runtime. O deploy solicita o token Vault se `$env:VAULT_TOKEN` não estiver definido. Não passe segredos ao Docker build nem salve usuário/senha em `secret.env`. Segredos completos são criados em arquivo temporário local para renderizar/aplicar o overlay e removidos ao final; proteja também o cluster local e a máquina.
 
 O script verifica propriedade/Engine do cluster, nós Ready, namespace existente, PostgreSQL disponível, Job de migração concluído, metrics-server disponível e controlador Traefik pronto. Depois constrói uma imagem com tag exclusiva, marca a origem Git em `APP_COMMIT_SHA` e carrega o mesmo arquivo de imagem nos dois nós. Se houver alterações não commitadas, a origem recebe o sufixo `-dirty`.
 
@@ -58,7 +58,7 @@ Mantenha o port-forward aberto enquanto usa a API:
 - Liveness: `http://127.0.0.1:8089/actuator/health/liveness`
 - Readiness: `http://127.0.0.1:8089/actuator/health/readiness`
 
-Faça login em `POST /api/v1/auth/login` com `{"usuario":"<ADMIN_USER>","senha":"<ADMIN_PASSWORD>"}` e utilize o token Bearer. Essas credenciais criam o administrador somente quando ele ainda não existe; alterar o Secret não rotaciona a senha de um usuário persistido.
+Faça login em `POST /api/v1/auth/login` com o usuário/senha armazenados em KV `secret/data/oficina-local` e utilize o token Bearer. Essas credenciais criam o administrador somente quando ele ainda não existe; alterar o Vault Secret não rotaciona a senha de um usuário persistido.
 
 O Service continua interno; o Ingress encaminha HTTP para ele. O HPA usa métricas reais de CPU do metrics-server. A escala sobe no máximo dois Pods a cada 30 segundos; para reduzir, considera uma janela de estabilização de 60 segundos e remove no máximo um Pod a cada 30 segundos. Essas opções do laboratório não alteram o HPA AWS, que mantém sua janela de 300 segundos.
 

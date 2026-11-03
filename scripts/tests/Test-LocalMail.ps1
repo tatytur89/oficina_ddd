@@ -3,8 +3,7 @@ param(
     [Parameter(Mandatory=$true)][string]$Recipient,
     [string]$Namespace = 'oficina-local',
     [ValidatePattern('^http://127\.0\.0\.1:[0-9]+$')][string]$BaseUrl = 'http://127.0.0.1:8090',
-    [string]$IngressHost,
-    [string]$ApiSecretFile
+    [string]$IngressHost
 )
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
@@ -16,12 +15,16 @@ if (!$IngressHost) { $IngressHost=if($Namespace -eq 'oficina-local'){'oficina.lo
 if ($IngressHost -notmatch '^(oficina\.local|[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.oficina\.local)$') { throw 'Invalid local Ingress host.' }
 try { $mailAddress = New-Object Net.Mail.MailAddress($Recipient) } catch { throw 'Invalid recipient address.' }
 if ($mailAddress.Address -cne $Recipient) { throw 'Provide a single plain recipient address.' }
-if (!$ApiSecretFile) { $ApiSecretFile = Join-Path $repoRoot 'k8s/local/secret.env' }
-$credentials = @{}
-foreach ($line in [IO.File]::ReadAllLines([IO.Path]::GetFullPath($ApiSecretFile))) {
-    if ($line -match '^(ADMIN_USER|ADMIN_PASSWORD)=(.+)$') { $credentials[$Matches[1]] = $Matches[2] }
+. (Join-Path $repoRoot 'infra/local/vault/scripts/LocalVault.ps1')
+$vaultToken = Get-LocalVaultToken
+$vaultForward = $null
+try {
+    $vaultForward = Start-LocalVaultPortForward (Join-Path $repoRoot 'infra/local/.generated/kubeconfig') 'kind-oficina-local'
+    $vaultCredentials = Get-LocalVaultCredentials "http://127.0.0.1:$($vaultForward.Port)" $vaultToken
+    $credentials = @{ ADMIN_USER = $vaultCredentials.admin_user; ADMIN_PASSWORD = $vaultCredentials.admin_password }
+} finally {
+    Stop-LocalVaultPortForward $vaultForward
 }
-if (!$credentials.ContainsKey('ADMIN_USER') -or !$credentials.ContainsKey('ADMIN_PASSWORD')) { throw 'API credentials are missing from the local Secret file.' }
 $headers = @{Host=$IngressHost}
 function Invoke-MailTestApi([string]$Path, [string]$Method='GET', [object]$Body=$null) {
     $arguments = @{Uri=($BaseUrl+$Path);Method=$Method;Headers=$headers;TimeoutSec=45}

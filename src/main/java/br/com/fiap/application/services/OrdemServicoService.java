@@ -141,6 +141,18 @@ public class OrdemServicoService implements OrdemServicoUseCase {
     }
 
     @Override
+    @Transactional
+    public void excluirLogicamente(Long id) {
+        if (id == null) {
+            throw new IllegalArgumentException("O ID da OS é obrigatório.");
+        }
+        OrdemServico os = osRepositoryPort.buscarPorIdParaAtualizacao(id)
+                .orElseThrow(() -> new ResourceNotFoundException("OS não encontrada com ID: " + id));
+        os.marcarComoExcluida();
+        osRepositoryPort.salvar(os);
+    }
+
+    @Override
     public List<OrdemServico> listarTodas() {
         return osRepositoryPort.buscarTodas().stream()
                 .filter(os -> os.getStatus() != StatusOS.FINALIZADA && os.getStatus() != StatusOS.ENTREGUE)

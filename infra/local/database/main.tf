@@ -1,12 +1,13 @@
 locals {
-  kubeconfig       = yamldecode(file(pathexpand(var.kubeconfig_path)))
-  selected_context = one([for context in local.kubeconfig.contexts : context.context if context.name == var.context])
-  selected_cluster = one([for cluster in local.kubeconfig.clusters : cluster.cluster if cluster.name == local.selected_context.cluster])
-  image            = "postgres:18.4-alpine3.23@sha256:996d0920e4ff9df1fc19dacb904492f3c1ec0ec1cc338f0ad7123be7731c5f5e"
-  migrations_dir   = "${path.module}/../../../src/main/resources/db/migration"
-  migrations       = { for name in fileset(local.migrations_dir, "V*.sql") : name => replace(file("${local.migrations_dir}/${name}"), "\r\n", "\n") }
-  runner           = replace(file("${path.module}/../../../database/migrate.sh"), "\r\n", "\n")
-  revision         = substr(sha256(jsonencode({ sql = local.migrations, runner = local.runner })), 0, 12)
+  kubeconfig           = yamldecode(file(pathexpand(var.kubeconfig_path)))
+  selected_context     = one([for context in local.kubeconfig.contexts : context.context if context.name == var.context])
+  selected_cluster     = one([for cluster in local.kubeconfig.clusters : cluster.cluster if cluster.name == local.selected_context.cluster])
+  image                = "postgres:18.4-alpine3.23@sha256:996d0920e4ff9df1fc19dacb904492f3c1ec0ec1cc338f0ad7123be7731c5f5e"
+  migrations_dir       = "${path.module}/../../../src/main/resources/db/migration"
+  migrations           = { for name in fileset(local.migrations_dir, "V*.sql") : name => replace(file("${local.migrations_dir}/${name}"), "\r\n", "\n") }
+  runner               = replace(file("${path.module}/../../../database/migrate.sh"), "\r\n", "\n")
+  revision             = substr(sha256(jsonencode({ sql = local.migrations, runner = local.runner })), 0, 12)
+  postgres_secret_name = var.external_secrets ? "postgres-secret" : kubernetes_secret_v1.postgres[0].metadata[0].name
 }
 
 # Namespace lifecycle belongs to the application, not to this database root.
@@ -21,6 +22,8 @@ data "kubernetes_namespace_v1" "target" {
 }
 
 resource "kubernetes_secret_v1" "postgres" {
+  count = var.external_secrets ? 0 : 1
+
   metadata {
     name      = "postgres-secret"
     namespace = data.kubernetes_namespace_v1.target.metadata[0].name
@@ -76,7 +79,7 @@ resource "kubernetes_stateful_set_v1" "postgres" {
             container_port = 5432
           }
           env_from {
-            secret_ref { name = kubernetes_secret_v1.postgres.metadata[0].name }
+            secret_ref { name = local.postgres_secret_name }
           }
           env {
             name  = "PGDATA"
@@ -131,9 +134,6 @@ resource "kubernetes_config_map_v1" "schema" {
 }
 
 resource "kubernetes_job_v1" "schema" {
-  lifecycle {
-    replace_triggered_by = [kubernetes_secret_v1.postgres]
-  }
   metadata {
     name      = "oficina-schema-${local.revision}"
     namespace = var.namespace
@@ -168,7 +168,7 @@ resource "kubernetes_job_v1" "schema" {
               name = env.key
               value_from {
                 secret_key_ref {
-                  name = kubernetes_secret_v1.postgres.metadata[0].name
+                  name = local.postgres_secret_name
                   key  = env.value
                 }
               }
@@ -193,5 +193,5 @@ resource "kubernetes_job_v1" "schema" {
   }
   wait_for_completion = true
   timeouts { create = "5m" }
-  depends_on = [kubernetes_stateful_set_v1.postgres]
+  depends_on = [kubernetes_stateful_set_v1.postgres, kubernetes_secret_v1.postgres]
 }

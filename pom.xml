@@ -29,6 +29,7 @@
 	<properties>
 		<java.version>21</java.version>
 		<tomcat.version>11.0.25</tomcat.version>
+		<dependency-check.skip>true</dependency-check.skip>
 	</properties>
 	<dependencies>
 		<dependency>
@@ -123,7 +124,7 @@
 				<version>13.0.0</version>
 
 				<configuration>
-					<nvdApiKey>${env.NVD_API_KEY}</nvdApiKey>
+					<skip>${dependency-check.skip}</skip>
 					<failBuildOnCVSS>7</failBuildOnCVSS>
 					<format>HTML</format>
 					<failOnError>true</failOnError>

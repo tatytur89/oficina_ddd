@@ -6,6 +6,7 @@ import java.util.List;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -243,6 +244,24 @@ public class OrdemServicoController {
         OrdemServico os = osUseCase.buscarPorId(id);
 
         return ResponseEntity.ok(new Response<>("success", "OS encontrada com sucesso", OrdemServicoMapper.toResponse(os)));
+    }
+
+    @Operation(
+        summary = "Excluir logicamente uma OS",
+        description = "Marca a OS como excluída sem remover os dados. A OS continua disponível nas consultas, "
+                + "com `excluidaEm` preenchido nas respostas. Permitido somente nos status `RECEBIDA` e `ENTREGUE`."
+    )
+    @ApiResponses(value = {
+        @ApiResponse(responseCode = "200", description = "OS marcada como excluída"),
+        @ApiResponse(responseCode = "400", description = "OS não está em status permitido"),
+        @ApiResponse(responseCode = "404", description = "OS não encontrada")
+    })
+    @DeleteMapping("/{id}")
+    public ResponseEntity<Response<Void>> excluirLogicamente(
+            @Parameter(description = "ID da Ordem de Serviço", example = "1", required = true)
+            @PathVariable Long id) {
+        osUseCase.excluirLogicamente(id);
+        return ResponseEntity.ok(new Response<>("success", "OS excluída logicamente com sucesso", null));
     }
 
     @Operation(

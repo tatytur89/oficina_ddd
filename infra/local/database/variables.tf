@@ -19,12 +19,21 @@ variable "namespace" {
     error_message = "Use oficina-local ou namespace isolado oficina-db-test-<id>."
   }
 }
+
+variable "external_secrets" {
+  type        = bool
+  description = "Use an existing Kubernetes Secret populated outside Terraform."
+  default     = false
+}
+
 variable "database_password" {
   type        = string
   sensitive   = true
-  description = "Senha local do PostgreSQL; deve corresponder ao Secret da aplicacao."
+  description = "Senha usada apenas quando external_secrets=false (por exemplo, no CI efêmero)."
+  default     = null
+
   validation {
-    condition     = length(var.database_password) >= 16
-    error_message = "Informe uma senha com pelo menos 16 caracteres."
+    condition     = var.external_secrets ? true : (var.database_password != null && length(var.database_password) >= 16)
+    error_message = "Informe database_password com pelo menos 16 caracteres ou habilite external_secrets."
   }
 }

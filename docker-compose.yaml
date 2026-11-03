@@ -11,6 +11,11 @@ services:
     environment:
       SPRING_PROFILES_ACTIVE: docker
       SPRING_JPA_HIBERNATE_DDL_AUTO: update
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/oficina_db
+      SPRING_DATASOURCE_USERNAME: ${SPRING_DATASOURCE_USERNAME:?Run scripts/Start-LocalCompose.ps1 to load Vault credentials}
+      SPRING_DATASOURCE_PASSWORD: ${SPRING_DATASOURCE_PASSWORD:?Run scripts/Start-LocalCompose.ps1 to load Vault credentials}
+      ADMIN_USER: ${ADMIN_USER:?Run scripts/Start-LocalCompose.ps1 to load Vault credentials}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:?Run scripts/Start-LocalCompose.ps1 to load Vault credentials}
     depends_on:
       postgres:
         condition: service_healthy
@@ -21,10 +26,10 @@ services:
       - "5432:5432"
     environment:
       POSTGRES_DB: oficina_db
-      POSTGRES_USER: oficina_user
-      POSTGRES_PASSWORD: password123
+      POSTGRES_USER: ${SPRING_DATASOURCE_USERNAME:?Run scripts/Start-LocalCompose.ps1 to load Vault credentials}
+      POSTGRES_PASSWORD: ${SPRING_DATASOURCE_PASSWORD:?Run scripts/Start-LocalCompose.ps1 to load Vault credentials}
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U oficina_user -d oficina_db"]
+      test: ["CMD-SHELL", "pg_isready -U \"$${POSTGRES_USER}\" -d \"$${POSTGRES_DB}\""]
       interval: 5s
       timeout: 5s
       retries: 5

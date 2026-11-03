@@ -12,6 +12,7 @@ public interface OrdemServicoUseCase {
     OrdemServico adicionarServico(Long osId, Long servicoId, int quantidade);
     OrdemServico adicionarPeca(Long osId, Long pecaId, int quantidade);
     OrdemServico buscarPorId(Long id);
+    void excluirLogicamente(Long id);
     List<OrdemServico> listarTodas();
     List<OrdemServico> listarPorCliente(Long clienteId);
     List<OrdemServico> listarPorStatus(StatusOS status);
